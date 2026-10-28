@@ -19,11 +19,15 @@ timer, and a month of focus history.
 
 ## Usage
 
-1. **Open the page.** It opens on startup when no note is open. You can also click
+1. **Open the page.** It opens on startup, replacing the note the vault restored
+   rather than sitting beside it, so nothing flashes up first. You can also click
    the house icon in the left ribbon, or run `Thinker: Open home page`.
-2. **Read the list.** Folders are headings, notes sit under them. Pick a range at
-   the top: `All`, `Recent`, `Pinned`. Choosing a folder shows its own notes and
-   folds the subfolders into headings.
+2. **Read the list.** The page opens on the first folder in the row. The range row
+   lists your own folders first, then `All`, `Recent` and `Pinned`. Folders are
+   headings and notes sit under them; choosing a folder shows its own notes and
+   folds the subfolders into headings. The order of the list is set in
+   `Settings → Thinker → Note order`: name A to Z, name Z to A, newest first or
+   oldest first.
 3. **Create something.** The `+` at the end of the range row opens one dialog for
    both kinds: pick `Note` or `Folder`, type a name, then pick a place from the
    vault's outline, where every folder is listed and that level is shown by text
@@ -122,9 +126,13 @@ English                 1
 
 一级文件夹 15px，二级 13px，三级及以下 12px。点击文件夹可折叠该分支，折叠后仅保留文件夹行。
 
-顶部三个页签（全部 / 最近 / 收藏）控制范围。输入搜索内容时列表转为平铺结果，清空后恢复。
+顶部分类行先列库内文件夹，再列全部 / 最近 / 收藏。打开页面时默认选中第一个文件夹，按当前排序的第一项；库里没有文件夹时落在全部。输入搜索内容时列表转为平铺结果，清空后恢复。
+
+排序在 设置 → 笔记排序 中选定，四档：名称 A → Z、名称 Z → A、时间 新 → 旧、时间 旧 → 新。文件夹顺序随名称方向，时间档对文件夹不适用，仍按名称升序。搜索时按匹配度排序，结果不受该设置影响。
 
 设置 → 隐藏的文件夹 可排除指定目录，子目录一并排除，不进入索引。
+
+添加到收藏的笔记不再浮到列表顶部，避免打乱所选顺序。收藏仍是独立的分类。
 
 新建时点分类行末尾的 `+`，弹窗里有三件事：类型（笔记或文件夹）、名称、位置。位置按库内目录列出，空文件夹也会出现，层级高的字号大、层级低的字号小，不缩进。目标目录不存在时会逐级建好再放进去。
 

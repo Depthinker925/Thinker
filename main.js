@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "2.4.1028 · index sheet";
+const BUILD = "2.108.1028 · index sheet";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -151,11 +151,15 @@ const EN = {
   "settings.scopeFull": "Titles and full text",
   "settings.scopeDesc": "Full text builds a background cache and grows with the vault",
   "settings.listLimit": "Rows in the list",
+  "settings.noteSort": "Note order",
+  "settings.sortNameAsc": "Name, A to Z",
+  "settings.sortNameDesc": "Name, Z to A",
+  "settings.sortNewest": "Newest first",
+  "settings.sortOldest": "Oldest first",
   "settings.pins": "Pinned notes",
-  "settings.pinsDesc": "One path per line. Pinned notes float to the top of every list",
   "settings.pinsNone": "Empty",
   "settings.hiddenFolders": "Hidden folders",
-  "settings.hiddenFoldersHint": "One path per line, subfolders included",
+  "settings.hiddenFoldersHint": "One path per line, subfolders included, case ignored",
 
   "settings.timer": "Focus timer",
   "settings.focusLength": "Focus length",
@@ -316,11 +320,15 @@ const ZH = {
   "settings.scopeFull": "标题与正文全文",
   "settings.scopeDesc": "全文模式会在后台建缓存，库越大越慢",
   "settings.listLimit": "列表条数",
+  "settings.noteSort": "笔记排序",
+  "settings.sortNameAsc": "名称 A → Z",
+  "settings.sortNameDesc": "名称 Z → A",
+  "settings.sortNewest": "时间 新 → 旧",
+  "settings.sortOldest": "时间 旧 → 新",
   "settings.pins": "收藏的笔记",
-  "settings.pinsDesc": "一行一个路径。收藏的笔记会浮在所有列表最上面",
   "settings.pinsNone": "空",
   "settings.hiddenFolders": "隐藏的文件夹",
-  "settings.hiddenFoldersHint": "一行一个路径，含子文件夹",
+  "settings.hiddenFoldersHint": "一行一个路径，含子文件夹，不区分大小写",
 
   "settings.timer": "专注计时",
   "settings.focusLength": "专注时长",
@@ -512,6 +520,20 @@ function newId() {
 
 /* Substring wins outright, a scattered subsequence still matches, and shorter
  * titles beat longer ones so that "math" prefers "Math.md" over "Math history.md". */
+/* The four orders offered in the settings. Time compares the modified stamp; name
+   compares the title, with the path as a tie-break so the result never shuffles
+   between two notes that share a name. */
+const NOTE_ORDERS = ["name-asc", "name-desc", "time-asc", "time-desc"];
+
+function sorterFor(order) {
+  const byName = (a, b) => a.title.localeCompare(b.title, "zh") || a.path.localeCompare(b.path, "zh");
+  const byTime = (a, b) => a.mtime - b.mtime || byName(a, b);
+  if (order === "name-desc") return (a, b) => byName(b, a);
+  if (order === "time-asc") return byTime;
+  if (order === "time-desc") return (a, b) => byTime(b, a);
+  return byName;
+}
+
 function fuzzyScore(query, text) {
   if (!query) return 0;
   if (!text) return -1;
@@ -574,14 +596,18 @@ class NoteIndex {
     }
   }
 
-  /* A folder on the list, or anything inside it, stays out of the index. */
+  /* A folder on the list, or anything inside it, stays out of the index. The
+     compare ignores case: the folder on disk may be `Focuslog` while the line in
+     the settings says `FocusLog`, and a case-sensitive test silently hides
+     nothing, because Windows keeps the name the file system gave it. */
   hiddenFolders() {
-    return parseLines(this.getSettings().hiddenFolders);
+    return parseLines(this.getSettings().hiddenFolders).map((line) => line.toLowerCase());
   }
 
   isHidden(dir) {
     if (!dir) return false;
-    return this.hiddenFolders().some((skip) => dir === skip || dir.startsWith(skip + "/"));
+    const lower = dir.toLowerCase();
+    return this.hiddenFolders().some((skip) => lower === skip || lower.startsWith(skip + "/"));
   }
 
   rebuild() {
@@ -683,9 +709,9 @@ class NoteIndex {
 
     const keep = (path) => {
       if (!path || path === "/" || isIgnoredPath(path)) return false;
-      if (hidden.some((skip) => path === skip || path.startsWith(skip + "/"))) return false;
-      if (roots.length === 0) return true;
       const lower = path.toLowerCase();
+      if (hidden.some((skip) => lower === skip || lower.startsWith(skip + "/"))) return false;
+      if (roots.length === 0) return true;
       return roots.some((root) => lower === root || lower.startsWith(root + "/"));
     };
 
@@ -715,10 +741,11 @@ class NoteIndex {
     return parseLines(this.getSettings().pinnedNotes);
   }
 
-  /* Pinned first, then whatever answers the query best, then the newest. */
+  /* A query ranks by relevance; without one the order is the one chosen in the
+     settings. Pinned notes are no longer hoisted above everything: 收藏 is its own
+     range, and hoisting broke every order that could be picked. */
   list(category, sub, query, limit) {
-    const pinned = this.pinnedPaths();
-    const pinnedSet = new Set(pinned);
+    const pinnedSet = new Set(this.pinnedPaths());
     const recentCut = Date.now() - 7 * 86400000;
     let pool = this.entries;
     if (category === "pinned") pool = pool.filter((entry) => pinnedSet.has(entry.path));
@@ -729,7 +756,6 @@ class NoteIndex {
     const q = String(query || "").trim();
     const scored = [];
     for (const entry of pool) {
-      const pin = pinnedSet.has(entry.path) ? 1 : 0;
       let score = 0;
       if (q) {
         score = Math.max(
@@ -740,12 +766,12 @@ class NoteIndex {
         );
         if (score < 0) continue;
       }
-      scored.push({ entry, score, pin });
+      scored.push({ entry, score });
     }
+    const compare = sorterFor(this.getSettings().noteSort);
     scored.sort((a, b) => {
-      if (b.pin !== a.pin) return b.pin - a.pin;
-      if (b.score !== a.score) return b.score - a.score;
-      return b.entry.mtime - a.entry.mtime;
+      if (q && b.score !== a.score) return b.score - a.score;
+      return compare(a.entry, b.entry);
     });
     return scored.slice(0, limit).map((item) => item.entry);
   }
@@ -1259,12 +1285,22 @@ class NotePanel {
   constructor(root, deps) {
     this.root = root;
     this.deps = deps;
-    this.category = "all";
+    this.category = this.firstCategory();
     this.query = "";
     this.results = [];
     this.rows = [];
     this.selected = 0;
     this.pendingQuery = "";
+  }
+
+  /* The first folder in the row, in the order the settings ask for. 全部 stays one
+     click away; it is the whole vault, which is rarely where a session starts. */
+  firstCategory() {
+    const folders = this.deps.index.folders().filter((folder) => folder.depth === 1);
+    if (folders.length === 0) return "all";
+    const descending = this.deps.getSettings().noteSort === "name-desc";
+    const ordered = descending ? folders.slice().reverse() : folders;
+    return ordered[0].path;
   }
 
   render() {
@@ -1311,17 +1347,22 @@ class NotePanel {
     chips.empty();
     const total = this.deps.index.entries.length;
     const pinned = this.deps.index.pinnedPaths().length;
-    const items = [
+    /* The user's own folders come first: they are the places notes actually live.
+       全部 / 最近 / 收藏 are ways of looking at the whole vault, so they close the
+       row. Top-level folders include the empty ones, so a folder just made appears
+       at once instead of waiting for a note to be filed in it. */
+    const settings = this.deps.getSettings();
+    const items = [];
+    const folders = this.deps.index.folders().filter((folder) => folder.depth === 1);
+    if (settings.noteSort === "name-desc") folders.reverse();
+    for (const folder of folders) {
+      items.push({ key: folder.path, label: folder.name, count: folder.count || null });
+    }
+    items.push(
       { key: "all", label: t("notes.all"), count: total },
       { key: "recent", label: t("notes.recent"), count: null },
       { key: "pinned", label: t("notes.pinned"), count: pinned || null }
-    ];
-    /* Top-level folders, empty ones included: a folder someone just made should
-       appear here at once, without waiting for a note to be filed in it. */
-    for (const folder of this.deps.index.folders()) {
-      if (folder.depth !== 1) continue;
-      items.push({ key: folder.path, label: folder.name, count: folder.count || null });
-    }
+    );
     if (this.category !== "all" && this.category !== "recent" && this.category !== "pinned") {
       const known = items.some((item) => item.key === this.category);
       if (!known) {
@@ -1439,9 +1480,12 @@ class NotePanel {
       for (const entry of byDir.get(dir) || []) addRow(entry);
     };
 
+    const descending = this.deps.getSettings().noteSort === "name-desc";
     const walk = (dir, depth) => {
       emitNotes(dir);
-      const kids = [...(children.get(dir) || [])].sort((a, b) => a.localeCompare(b, "zh"));
+      const kids = [...(children.get(dir) || [])].sort((a, b) =>
+        descending ? b.localeCompare(a, "zh") : a.localeCompare(b, "zh")
+      );
       for (const kid of kids) {
         const level = Math.min(4, depth + 1);
         const head = list.createDiv({ cls: "thinker-folder is-level-" + level });
@@ -2808,6 +2852,7 @@ const DEFAULT_SETTINGS = {
   indexRoots: "",
   searchScope: "title",
   listLimit: 40,
+  noteSort: "name-asc",
   pinnedNotes: "",
   hiddenFolders: "",
   focusMinutes: 25,
@@ -2845,6 +2890,7 @@ function readSettings(raw) {
     indexRoots: text("indexRoots"),
     searchScope: source.searchScope === "full" ? "full" : "title",
     listLimit: num("listLimit", 5, 400),
+    noteSort: NOTE_ORDERS.indexOf(source.noteSort) >= 0 ? source.noteSort : "name-asc",
     pinnedNotes: text("pinnedNotes"),
     hiddenFolders: text("hiddenFolders"),
     focusMinutes: num("focusMinutes", 1, 180),
@@ -2955,6 +3001,19 @@ class ThinkerSettingTab extends PluginSettingTab {
           this.plugin.refreshNoteViews();
         })
     );
+
+    new Setting(containerEl).setName(t("settings.noteSort")).addDropdown((drop) => {
+      drop.addOption("name-asc", t("settings.sortNameAsc"));
+      drop.addOption("name-desc", t("settings.sortNameDesc"));
+      drop.addOption("time-desc", t("settings.sortNewest"));
+      drop.addOption("time-asc", t("settings.sortOldest"));
+      drop.setValue(settings.noteSort);
+      drop.onChange((value) => {
+        settings.noteSort = value;
+        commit();
+        this.plugin.refreshNoteViews();
+      });
+    });
 
     new Setting(containerEl)
       .setName(t("settings.hiddenFolders"))
@@ -3113,7 +3172,6 @@ class ThinkerPlugin extends Plugin {
     );
     this.engine = new TimerEngine(() => this.settings, this.buildHooks());
 
-    console.log("[Thinker] build " + BUILD);
     this.registerView(VIEW_TYPE, (leaf) => new HomeView(leaf, this.viewDeps()));
     this.registerView(STATS_VIEW_TYPE, (leaf) => new StatsView(leaf, this.statsDeps()));
     this.addSettingTab(new ThinkerSettingTab(this.app, this));
@@ -3162,10 +3220,21 @@ class ThinkerPlugin extends Plugin {
   collapseLeftSidebar() {
     const split = this.app.workspace.leftSplit;
     if (!split || split.collapsed) return;
+    /* The transition is removed for this one collapse: on startup the sidebar is
+       otherwise seen sliding shut, which reads as a flicker. */
+    const el = split.containerEl;
+    if (el && el.style) el.style.transition = "none";
     try {
       split.collapse();
     } catch (error) {
       console.error("Thinker: could not collapse the left sidebar", error);
+    }
+    if (el && el.style) {
+      const restore = () => {
+        el.style.transition = "";
+      };
+      if (window.requestAnimationFrame) window.requestAnimationFrame(restore);
+      else window.setTimeout(restore, 0);
     }
   }
 
@@ -3315,6 +3384,31 @@ class ThinkerPlugin extends Plugin {
     if (typeof setting.openTabById === "function") setting.openTabById(this.manifest.id);
   }
 
+  /* The most recent leaf in the main area, or a new tab when there is none. A
+     sidebar leaf is never reused: the page would take the place of the file
+     explorer. */
+  reusableLeaf() {
+    const { workspace } = this.app;
+    let leaf = null;
+    try {
+      leaf = workspace.getMostRecentLeaf ? workspace.getMostRecentLeaf() : null;
+    } catch (error) {
+      leaf = null;
+    }
+    /* A sidebar leaf is rejected rather than compared against the main split: the
+       page would otherwise take the place of the file explorer. */
+    if (leaf && typeof leaf.getRoot === "function") {
+      try {
+        const root = leaf.getRoot();
+        const sidebars = [workspace.leftSplit, workspace.rightSplit].filter(Boolean);
+        if (sidebars.indexOf(root) >= 0) leaf = null;
+      } catch (error) {
+        leaf = null;
+      }
+    }
+    return leaf || workspace.getLeaf("tab");
+  }
+
   async openStats() {
     const { workspace } = this.app;
     const existing = workspace.getLeavesOfType(STATS_VIEW_TYPE);
@@ -3383,6 +3477,9 @@ class ThinkerPlugin extends Plugin {
     );
   }
 
+  /* Opening the page replaces the leaf the vault restored instead of adding a tab
+     beside it: on startup that restored note is otherwise visible for a frame,
+     which is the flicker. */
   async openHome(onlyIfEmpty) {
     const { workspace } = this.app;
     const existing = workspace.getLeavesOfType(VIEW_TYPE);
@@ -3390,12 +3487,8 @@ class ThinkerPlugin extends Plugin {
       await workspace.revealLeaf(existing[0]);
       return;
     }
-    if (onlyIfEmpty) {
-      const openNotes = workspace.getLeavesOfType("markdown").filter((leaf) => leaf.view && leaf.view.file);
-      if (openNotes.length > 0) return;
-    }
     try {
-      const leaf = workspace.getLeaf("tab");
+      const leaf = onlyIfEmpty ? this.reusableLeaf() : workspace.getLeaf("tab");
       if (!leaf) return;
       await leaf.setViewState({ type: VIEW_TYPE, active: true });
       await workspace.revealLeaf(leaf);
