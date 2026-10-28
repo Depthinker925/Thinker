@@ -1329,9 +1329,16 @@
 	}
 }
 
+/* Reduced motion is a token change, not an override: every duration in this sheet
+   reads --tk-dur, so one declaration covers all of them. The ring is the one
+   animation that carries its own duration. */
 @media (prefers-reduced-motion: reduce) {
-	.view-content.thinker-home * {
-		transition-duration: 1ms !important;
+	:root {
+		--tk-dur: 1ms;
+	}
+
+	.view-content.thinker-home .thinker-ring-arc {
+		transition-duration: 1ms;
 	}
 }
 
@@ -1346,7 +1353,7 @@
 .thinker-unit-tab,
 .thinker-icon-btn,
 .thinker-stats-range {
-	transition: color 130ms cubic-bezier(0.2, 0.7, 0.3, 1);
+	transition: color var(--tk-dur) cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 /* ---------- hover, in one place ----------
@@ -1374,7 +1381,7 @@
 .thinker-notes .thinker-note-title,
 .thinker-stats .thinker-unit-tab,
 .thinker-stats .thinker-stats-label {
-	transition: color 130ms cubic-bezier(0.2, 0.7, 0.3, 1);
+	transition: color var(--tk-dur) cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 /* The plus is a member of the range row, but it is not a range: it keeps a

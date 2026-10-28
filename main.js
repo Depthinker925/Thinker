@@ -3,14 +3,13 @@
  *
  * One view holds everything: the clock, the note list, the focus timer and a month
  * calendar. The timer engine, the day store and the calendar shape are carried over
- * from Thinkers; the note index and the layout are new. The TomaTodo bridge is merged
- * in and stays switched off until it is enabled in the settings.
+ * from Thinkers; the note index and the layout are new.
  *
  * Sections, in file order:
  *   1  i18n            2  date and text helpers      3  NoteIndex
  *   4  DayStore        5  TimerEngine + sound        6  NotePanel
  *   7  TimerPanel      8  CalendarPanel              9  HomeView
- *  10  Modals         11  TomaTodo bridge          12  SettingsTab
+ *  10  Modals         11  SettingsTab
  *  13  Plugin
  */
 
@@ -19,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "2.0.1028 · folders as headings";
+const BUILD = "2.2.1028 · review pass";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -116,15 +115,12 @@ const EN = {
   "notice.tooShort": "Session shorter than {seconds}s was not saved",
   "notice.recovered": "A session that ended while Obsidian was closed was saved",
   "notice.breakDone": "Break is over",
-  "notice.thinkersOn": "TomaTodo mirror is on",
-  "notice.thinkersOff": "TomaTodo mirror is off",
 
   "cmd.home": "Open the Thinker home page",
   "cmd.startStop": "Start or end a session",
   "cmd.newNote": "New note from the home page",
   "cmd.addManual": "Add a session by hand",
   "cmd.diary": "Open today's diary",
-  "cmd.checkLink": "Check the TomaTodo link",
 
   "status.idle": "Idle",
 
@@ -179,21 +175,6 @@ const EN = {
   "settings.diaryFolder": "Diary folder",
   "settings.diaryFormat": "Diary date format",
 
-  "settings.tomatodo": "TomaTodo",
-  "settings.tomatodoIntro": "When a stopwatch session runs here, the same count-up starts inside the 番茄ToDo desktop app. Only the stopwatch is mirrored, and only while this is on.",
-  "settings.tdEnabled": "Turn the mirror on",
-  "settings.tdEnabledDesc": "Off by default. Nothing is launched or polled until this is on",
-  "settings.tdExe": "TomaToDo path",
-  "settings.tdExeDesc": "Full path to TomaToDo.exe. It is started with its DevTools port, which is the only way to drive it without the mouse",
-  "settings.tdPort": "Debug port",
-  "settings.tdPortDesc": "Local port used to talk to the app",
-  "settings.tdTask": "Todo name",
-  "settings.tdTaskDesc": "The count-up is started on the todo with exactly this name. Create it there once, with the timer set to count-up",
-  "settings.tdRestart": "Restart 番茄ToDo when needed",
-  "settings.tdRestartDesc": "It allows one copy at a time and drops the debug flag when one is already open",
-  "settings.tdPoll": "Check every",
-  "settings.tdPollDesc": "Milliseconds between two reads of the timer",
-  "settings.tdTest": "Check the link now",
   "settings.about": "About",
   "settings.aboutDesc": "Thinker {version}. The timer, the records and the calendar come from Thinkers; only one of the two should be enabled at a time, or both will write the same daily files."
 };
@@ -290,15 +271,12 @@ const ZH = {
   "notice.tooShort": "不足 {seconds} 秒，没有记录",
   "notice.recovered": "关闭 Obsidian 期间结束的那一段已经补记",
   "notice.breakDone": "休息结束",
-  "notice.thinkersOn": "番茄ToDo 联动已开启",
-  "notice.thinkersOff": "番茄ToDo 联动已关闭",
 
   "cmd.home": "打开 Thinker 主页",
   "cmd.startStop": "开始或结束一次专注",
   "cmd.newNote": "在主页新建笔记",
   "cmd.addManual": "手动添加一条记录",
   "cmd.diary": "打开今天的日记",
-  "cmd.checkLink": "检查番茄ToDo 联动",
 
   "status.idle": "空闲",
 
@@ -353,21 +331,6 @@ const ZH = {
   "settings.diaryFolder": "日记目录",
   "settings.diaryFormat": "日记日期格式",
 
-  "settings.tomatodo": "番茄ToDo",
-  "settings.tomatodoIntro": "这里跑起一个正计时时，电脑端番茄ToDo 也同步开始一个正计时。只联动正计时，且只在开关打开时生效。",
-  "settings.tdEnabled": "开启联动",
-  "settings.tdEnabledDesc": "默认关闭。不打开这一项，插件不会启动、也不会访问任何外部进程",
-  "settings.tdExe": "番茄ToDo 路径",
-  "settings.tdExeDesc": "TomaToDo.exe 的完整路径。插件会带着调试端口启动它，这是唯一不动鼠标就能控制它的方式",
-  "settings.tdPort": "调试端口",
-  "settings.tdPortDesc": "和客户端通信的本地端口",
-  "settings.tdTask": "待办名称",
-  "settings.tdTaskDesc": "正计时会挂在这个名字的待办上。请先在番茄ToDo 里建好它，计时类型设为「正计时」",
-  "settings.tdRestart": "需要时重启番茄ToDo",
-  "settings.tdRestartDesc": "它同一时间只允许一个实例，已有的一份在跑时会丢掉调试端口参数",
-  "settings.tdPoll": "检查间隔",
-  "settings.tdPollDesc": "两次读取计时状态的间隔，单位毫秒",
-  "settings.tdTest": "立即检查联动",
   "settings.about": "关于",
   "settings.aboutDesc": "Thinker {version}。计时、记录与日历来自 Thinkers，两者请只启用一个，否则会同时写同一批每日文件。"
 };
@@ -2605,591 +2568,6 @@ function shortDay(dayKey) {
   return dayKey.slice(5).replace("-", ".");
 }
 
-/* ------------------------------------------------ 12  TomaTodo (desktop only)
-
- * Driving the 番茄ToDo client needs its DevTools port: the app exposes no other
- * interface, and the alternative would be synthetic mouse events. Everything here
- * is inert until the setting is switched on. */
-
-const TD_HELPERS = `
-  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
-  var q = function (sel) { return document.querySelector(sel); };
-  var activeId = function () { var el = q('.page.active'); return el ? el.id : null; };
-  var statusText = function () { var el = q('#timer-status'); return el ? (el.innerText || '').trim() : ''; };
-  var taskName = function () { var el = q('#timer-task-name'); return el ? (el.innerText || '').trim() : ''; };
-  var timerTime = function () { var el = q('#timer-time'); return el ? (el.innerText || '').trim() : ''; };
-  var waitFor = async function (fn, ms) {
-    var end = Date.now() + ms;
-    while (Date.now() < end) { if (fn()) return true; await sleep(150); }
-    return false;
-  };
-  var dialogOpen = function () { return !!q('#custom-dialog-overlay.show'); };
-  var confirmDialog = async function () {
-    if (!dialogOpen()) return false;
-    var btn = q('#custom-dialog-overlay .custom-dialog-btn.primary');
-    if (!btn) return false;
-    btn.click();
-    await waitFor(function () { return !dialogOpen(); }, 2000);
-    return true;
-  };
-  var result = function (ok, state, extra) {
-    var base = { ok: ok, state: state, page: activeId(), status: statusText(), name: taskName(), time: timerTime() };
-    if (extra) { for (var key in extra) base[key] = extra[key]; }
-    return base;
-  };
-`;
-
-function buildStartScript(taskName) {
-  return `(async function () {
-    ${TD_HELPERS}
-    var NAME = ${JSON.stringify(taskName)};
-    if (activeId() === 'page-timer') {
-      if (statusText().indexOf('\u4E13\u6CE8') >= 0) return result(true, 'already-running');
-      if (q('#stop-btn')) q('#stop-btn').click();
-      await sleep(400);
-      await confirmDialog();
-      await waitFor(function () { return activeId() === 'page-list'; }, 3000);
-    }
-    if (activeId() === 'page-not-synced' || activeId() === 'page-disconnect') return result(false, 'not-bound');
-    if (!(await waitFor(function () { return activeId() === 'page-list'; }, 3000))) return result(false, 'unexpected-page');
-    var items = Array.prototype.slice.call(document.querySelectorAll('#todo-list .todo-item'));
-    var target = null;
-    for (var i = 0; i < items.length; i++) {
-      var label = items[i].querySelector('.todo-name');
-      if (label && (label.innerText || '').trim() === NAME) { target = items[i]; break; }
-    }
-    if (!target) return result(false, 'task-not-found');
-    var startBtn = target.querySelector('.todo-start-btn');
-    if (!startBtn) return result(false, 'no-start-button');
-    startBtn.click();
-    var up = await waitFor(function () {
-      return activeId() === 'page-timer' && statusText().indexOf('\u4E13\u6CE8') >= 0;
-    }, 4000);
-    return result(up, up ? 'started' : 'not-running');
-  })()`;
-}
-
-function buildStopScript() {
-  return `(async function () {
-    ${TD_HELPERS}
-    if (activeId() !== 'page-timer') return result(true, 'idle');
-    if (statusText().indexOf('\u4E13\u6CE8') < 0) return result(true, 'not-focusing');
-    if (q('#stop-btn')) q('#stop-btn').click();
-    await sleep(400);
-    var confirmed = await confirmDialog();
-    if (!confirmed) return result(false, 'stop-failed');
-    if (await waitFor(function () { return statusText().indexOf('\u4F11\u606F') >= 0; }, 3000)) {
-      if (q('#stop-btn')) q('#stop-btn').click();
-      await sleep(400);
-      await confirmDialog();
-      await waitFor(function () { return activeId() === 'page-list'; }, 3000);
-    }
-    return result(true, 'stopped');
-  })()`;
-}
-
-function buildProbeScript() {
-  return `(async function () { ${TD_HELPERS} return result(true, 'probe'); })()`;
-}
-
-/* A minimal websocket client. The client speaks CDP over one socket, and the only
- * frames this bridge sends are text frames. */
-class CdpConnection {
-  constructor(socket, onFail) {
-    const { Buffer } = require("buffer");
-    this.Buffer = Buffer;
-    this.socket = socket;
-    this.onFail = onFail;
-    this.buffer = Buffer.alloc(0);
-    this.upgradeBuffer = Buffer.alloc(0);
-    this.fragments = [];
-    this.pending = new Map();
-    this.nextId = 0;
-    this.closed = false;
-    this.handshaken = false;
-    this.onUpgraded = null;
-    socket.on("data", (chunk) => this.onData(chunk));
-    socket.on("close", () => this.fail(new Error("connection closed")));
-    socket.on("error", (error) => this.fail(error));
-  }
-
-  static open(url, timeoutMs) {
-    const net = require("net");
-    const crypto = require("crypto");
-    const match = /^ws:\/\/([^/:]+):(\d+)(\/.*)?$/.exec(url);
-    if (!match) return Promise.reject(new Error("bad websocket url: " + url));
-    const host = match[1];
-    const port = Number(match[2]);
-    const path = match[3] || "/";
-    return new Promise((resolve, reject) => {
-      const key = crypto.randomBytes(16).toString("base64");
-      const socket = net.createConnection({ host, port });
-      let settled = false;
-      const timer = window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        socket.destroy();
-        reject(new Error("websocket handshake timed out"));
-      }, timeoutMs || 4000);
-      const conn = new CdpConnection(socket, (error) => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timer);
-        reject(error);
-      });
-      socket.once("error", (error) => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timer);
-        reject(error);
-      });
-      socket.once("connect", () => {
-        socket.write(
-          "GET " + path + " HTTP/1.1\r\n" +
-            "Host: " + host + ":" + port + "\r\n" +
-            "Upgrade: websocket\r\n" +
-            "Connection: Upgrade\r\n" +
-            "Sec-WebSocket-Key: " + key + "\r\n" +
-            "Sec-WebSocket-Version: 13\r\n\r\n"
-        );
-      });
-      conn.onUpgraded = () => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timer);
-        resolve(conn);
-      };
-    });
-  }
-
-  call(method, params, timeoutMs) {
-    if (this.closed) return Promise.reject(new Error("connection closed"));
-    const id = ++this.nextId;
-    return new Promise((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(method + " timed out"));
-      }, timeoutMs || 6000);
-      this.pending.set(id, { resolve, reject, timer });
-      try {
-        this.socket.write(this.encodeFrame(JSON.stringify({ id, method, params }), 1));
-      } catch (error) {
-        window.clearTimeout(timer);
-        this.pending.delete(id);
-        reject(error);
-      }
-    });
-  }
-
-  close() {
-    if (this.closed) return;
-    this.closed = true;
-    try {
-      this.socket.write(this.encodeFrame("", 8));
-    } catch (e) {
-      /* already gone */
-    }
-    this.socket.destroy();
-    this.rejectAll(new Error("connection closed"));
-  }
-
-  fail(error) {
-    if (this.closed) return;
-    this.closed = true;
-    this.socket.destroy();
-    if (this.onFail) this.onFail(error);
-    this.rejectAll(error);
-  }
-
-  rejectAll(error) {
-    for (const entry of this.pending.values()) {
-      window.clearTimeout(entry.timer);
-      entry.reject(error);
-    }
-    this.pending.clear();
-  }
-
-  onData(chunk) {
-    if (!this.handshaken) {
-      this.upgradeBuffer = this.Buffer.concat([this.upgradeBuffer, chunk]);
-      const end = this.upgradeBuffer.indexOf("\r\n\r\n");
-      if (end < 0) return;
-      const head = this.upgradeBuffer.subarray(0, end).toString("latin1");
-      const status = Number(head.split(" ")[1]);
-      if (status !== 101) {
-        this.fail(new Error("upgrade rejected with status " + status));
-        return;
-      }
-      this.handshaken = true;
-      const rest = this.upgradeBuffer.subarray(end + 4);
-      this.upgradeBuffer = this.Buffer.alloc(0);
-      if (this.onUpgraded) this.onUpgraded();
-      if (rest.length > 0) this.onData(rest);
-      return;
-    }
-    this.buffer = this.Buffer.concat([this.buffer, chunk]);
-    while (this.readFrame()) {
-      /* keep draining the socket */
-    }
-  }
-
-  readFrame() {
-    const buf = this.buffer;
-    if (buf.length < 2) return false;
-    const first = buf[0];
-    const second = buf[1];
-    const fin = (first & 128) !== 0;
-    const opcode = first & 15;
-    const masked = (second & 128) !== 0;
-    let length = second & 127;
-    let offset = 2;
-    if (length === 126) {
-      if (buf.length < 4) return false;
-      length = buf.readUInt16BE(2);
-      offset = 4;
-    } else if (length === 127) {
-      if (buf.length < 10) return false;
-      length = buf.readUInt32BE(6);
-      offset = 10;
-    }
-    let mask = null;
-    if (masked) {
-      if (buf.length < offset + 4) return false;
-      mask = buf.subarray(offset, offset + 4);
-      offset += 4;
-    }
-    if (buf.length < offset + length) return false;
-    let payload = buf.subarray(offset, offset + length);
-    if (mask) {
-      const copy = this.Buffer.alloc(length);
-      for (let i = 0; i < length; i++) copy[i] = payload[i] ^ mask[i & 3];
-      payload = copy;
-    }
-    this.buffer = buf.subarray(offset + length);
-    if (opcode === 9) {
-      try {
-        this.socket.write(this.encodeFrame("", 10, payload));
-      } catch (e) {
-        /* a ping is best effort */
-      }
-      return true;
-    }
-    if (opcode === 10) return true;
-    if (opcode === 8) {
-      this.fail(new Error("server closed the connection"));
-      return false;
-    }
-    if (opcode === 1 || opcode === 0) {
-      this.fragments.push(payload.toString("utf8"));
-      if (fin) {
-        const text = this.fragments.join("");
-        this.fragments = [];
-        this.dispatch(text);
-      }
-      return true;
-    }
-    return true;
-  }
-
-  dispatch(text) {
-    let message;
-    try {
-      message = JSON.parse(text);
-    } catch (e) {
-      return;
-    }
-    if (typeof message.id !== "number") return;
-    const entry = this.pending.get(message.id);
-    if (!entry) return;
-    this.pending.delete(message.id);
-    window.clearTimeout(entry.timer);
-    if (message.error) entry.reject(new Error(message.error.message || "protocol error"));
-    else entry.resolve(message.result);
-  }
-
-  encodeFrame(text, opcode, rawPayload) {
-    const crypto = require("crypto");
-    const payload = rawPayload ? rawPayload : this.Buffer.from(text, "utf8");
-    const length = payload.length;
-    const head = [128 | (opcode || 1)];
-    if (length < 126) head.push(128 | length);
-    else if (length < 65536) head.push(128 | 126, (length >> 8) & 255, length & 255);
-    else head.push(128 | 127, 0, 0, 0, 0, (length >>> 24) & 255, (length >>> 16) & 255, (length >>> 8) & 255, length & 255);
-    const mask = crypto.randomBytes(4);
-    const out = this.Buffer.alloc(head.length + 4 + length);
-    this.Buffer.from(head).copy(out, 0);
-    mask.copy(out, head.length);
-    for (let i = 0; i < length; i++) out[head.length + 4 + i] = payload[i] ^ mask[i & 3];
-    return out;
-  }
-}
-
-const TD_BLOCKED = new Set(["not-installed", "needs-restart", "not-bound", "task-not-found", "unexpected-page"]);
-const TD_TRANSIENT = /Target crashed|Execution context was destroyed|Cannot find context|no page target|connection closed|websocket/i;
-const TD_SAFE_FLAGS = ["--disable-gpu", "--no-sandbox"];
-
-class TomatodoBridge {
-  constructor(getSettings) {
-    this.getSettings = getSettings;
-    this.queue = Promise.resolve();
-    this.safeMode = false;
-  }
-
-  start() {
-    return this.enqueue(() => this.attempt(() => this.doStart()));
-  }
-
-  stop() {
-    return this.enqueue(() => this.attempt(() => this.doStop()));
-  }
-
-  check() {
-    return this.enqueue(() => this.attempt(() => this.doCheck()));
-  }
-
-  enqueue(task) {
-    const run = this.queue
-      .then(task, task)
-      .catch((error) => ({ ok: false, state: "error", code: "internal", detail: String(error && error.message ? error.message : error) }));
-    this.queue = run;
-    return run;
-  }
-
-  async attempt(task) {
-    const run = async () => {
-      try {
-        return await task();
-      } catch (error) {
-        return { ok: false, state: "error", code: "internal", detail: String(error && error.message ? error.message : error) };
-      }
-    };
-    const first = await run();
-    if (first.ok || TD_BLOCKED.has(first.code || "internal") || this.safeMode) return first;
-    this.safeMode = true;
-    await this.quitRunning();
-    await delay(600);
-    return run();
-  }
-
-  port() {
-    const value = Number(this.getSettings().tomatodoPort);
-    return Number.isFinite(value) && value > 0 ? Math.round(value) : 9222;
-  }
-
-  exe() {
-    return String(this.getSettings().tomatodoExe || "").trim();
-  }
-
-  doStart() {
-    return this.ensureRunning().then(async (ready) => {
-      if (ready !== "ready") return { ok: false, state: ready, code: ready };
-      const raw = await this.evaluate(buildStartScript(this.getSettings().tomatodoTask), 25000);
-      return normaliseTd(raw);
-    });
-  }
-
-  doStop() {
-    return this.portOpen().then(async (open) => {
-      if (!open) return { ok: true, state: "not-running" };
-      const raw = await this.evaluate(buildStopScript(), 20000);
-      return normaliseTd(raw);
-    });
-  }
-
-  doCheck() {
-    return this.ensureRunning().then(async (ready) => {
-      if (ready !== "ready") return { ok: false, state: ready, code: ready };
-      const raw = await this.evaluate(buildProbeScript(), 8000);
-      return normaliseTd(raw);
-    });
-  }
-
-  async portOpen() {
-    try {
-      await this.getJson(`http://127.0.0.1:${this.port()}/json/version`, 800);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  async ensureRunning() {
-    if (await this.portOpen()) return "ready";
-    const exe = this.exe();
-    if (!exe) return "not-installed";
-    if (await this.isRunning()) {
-      if (!this.getSettings().tomatodoRestart) return "needs-restart";
-      await this.quitRunning();
-    }
-    const first = await this.launch(exe, this.safeMode ? TD_SAFE_FLAGS : []);
-    if (first === "missing") return "not-installed";
-    if (await this.waitForPort(9000)) return "ready";
-    const second = await this.launch(exe, TD_SAFE_FLAGS);
-    if (second === "missing") return "not-installed";
-    if (await this.waitForPort(9000)) return "ready";
-    return "launch-failed";
-  }
-
-  isRunning() {
-    const cp = require("child_process");
-    const name = String(this.exe().split(/[\\/]/).pop() || "").replace(/\.exe$/i, "");
-    if (!name) return Promise.resolve(false);
-    return new Promise((resolve) => {
-      cp.execFile("tasklist", ["/FI", `IMAGENAME eq ${name}.exe`, "/NH"], { windowsHide: true }, (error, stdout) => {
-        if (error) {
-          resolve(false);
-          return;
-        }
-        resolve(String(stdout).toLowerCase().includes(name.toLowerCase() + ".exe"));
-      });
-    });
-  }
-
-  launch(exe, extra) {
-    const cp = require("child_process");
-    return new Promise((resolve) => {
-      let settled = false;
-      const done = (result) => {
-        if (settled) return;
-        settled = true;
-        resolve(result);
-      };
-      const env = { ...process.env };
-      delete env.ELECTRON_RUN_AS_NODE;
-      delete env.NODE_OPTIONS;
-      try {
-        const child = cp.spawn(exe, [`--remote-debugging-port=${this.port()}`, ...extra], {
-          cwd: exe.replace(/[\\/][^\\/]+$/, ""),
-          detached: true,
-          stdio: "ignore",
-          env
-        });
-        child.once("error", (error) => done(error && error.code === "ENOENT" ? "missing" : "failed"));
-        child.unref();
-        window.setTimeout(() => done("ok"), 600);
-      } catch (e) {
-        done("failed");
-      }
-    });
-  }
-
-  async waitForPort(timeoutMs) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      if (await this.portOpen()) {
-        await this.waitForTarget(6000);
-        return true;
-      }
-      await delay(300);
-    }
-    return false;
-  }
-
-  async waitForTarget(timeoutMs) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      try {
-        const list = await this.getJson(`http://127.0.0.1:${this.port()}/json/list`, 1500);
-        const hasPage = Array.isArray(list) && list.some((item) => item.type === "page" && typeof item.webSocketDebuggerUrl === "string");
-        if (hasPage) {
-          await delay(700);
-          return;
-        }
-      } catch (e) {
-        /* the port answers before the renderer is ready */
-      }
-      await delay(250);
-    }
-  }
-
-  async quitRunning() {
-    await runTaskkill(["/IM", "TomaToDo.exe"]);
-    await delay(1500);
-    await runTaskkill(["/F", "/IM", "TomaToDo.exe"]);
-    await delay(800);
-  }
-
-  async evaluate(expression, timeoutMs) {
-    let lastError = new Error("evaluate failed");
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try {
-        return await this.evaluateOnce(expression, timeoutMs);
-      } catch (error) {
-        lastError = error;
-        if (!TD_TRANSIENT.test(String(error && error.message ? error.message : error))) throw error;
-        await delay(500 + attempt * 400);
-      }
-    }
-    throw lastError;
-  }
-
-  async evaluateOnce(expression, timeoutMs) {
-    const list = await this.getJson(`http://127.0.0.1:${this.port()}/json/list`, 2000);
-    const page = Array.isArray(list)
-      ? list.find((item) => item.type === "page" && typeof item.webSocketDebuggerUrl === "string")
-      : null;
-    if (!page) throw new Error("no page target on the debug port");
-    const connection = await CdpConnection.open(String(page.webSocketDebuggerUrl), 4000);
-    try {
-      const reply = await connection.call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }, timeoutMs);
-      if (reply && reply.exceptionDetails) throw new Error(reply.exceptionDetails.text || "script threw");
-      return reply && reply.result ? reply.result.value : undefined;
-    } finally {
-      connection.close();
-    }
-  }
-
-  getJson(url, timeoutMs) {
-    const http = require("http");
-    return new Promise((resolve, reject) => {
-      const request = http.get(url, (response) => {
-        let body = "";
-        response.setEncoding("utf8");
-        response.on("data", (chunk) => {
-          body += chunk;
-        });
-        response.on("end", () => {
-          try {
-            resolve(JSON.parse(body));
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
-      request.on("error", reject);
-      request.on("socket", (socket) => {
-        socket.setTimeout(timeoutMs, () => request.destroy(new Error("timeout")));
-      });
-    });
-  }
-}
-
-function normaliseTd(raw) {
-  if (!raw || typeof raw !== "object") return { ok: false, state: "unknown", code: "protocol", detail: "empty reply" };
-  const state = String(raw.state || "unknown");
-  const detail = [raw.page, raw.status].filter(Boolean).join(" / ");
-  if (raw.ok === true) return { ok: true, state, detail };
-  const code = state === "not-bound" || state === "task-not-found" || state === "unexpected-page" ? state : "internal";
-  return { ok: false, state, code, detail };
-}
-
-function runTaskkill(args) {
-  const cp = require("child_process");
-  return new Promise((resolve) => {
-    try {
-      cp.execFile("taskkill", args, { windowsHide: true }, () => resolve());
-    } catch (e) {
-      resolve();
-    }
-  });
-}
-
-function delay(ms) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-/* ------------------------------------------------------------ 13  Settings */
-
 const DEFAULT_SETTINGS = {
   openOnStartup: true,
   collapseLeftSidebar: true,
@@ -3216,12 +2594,6 @@ const DEFAULT_SETTINGS = {
   weekStart: 1,
   dailyNotesFolder: "",
   dailyNotesFormat: "",
-  tomatodoEnabled: false,
-  tomatodoExe: "C:\\Program Files\\TomaToDo\\TomaToDo.exe",
-  tomatodoPort: 9222,
-  tomatodoTask: "专注",
-  tomatodoRestart: true,
-  tomatodoPollMs: 700
 };
 
 function readSettings(raw) {
@@ -3259,12 +2631,6 @@ function readSettings(raw) {
     weekStart: Number(source.weekStart) === 0 ? 0 : 1,
     dailyNotesFolder: text("dailyNotesFolder"),
     dailyNotesFormat: text("dailyNotesFormat"),
-    tomatodoEnabled: flag("tomatodoEnabled"),
-    tomatodoExe: text("tomatodoExe"),
-    tomatodoPort: num("tomatodoPort", 1024, 65535),
-    tomatodoTask: text("tomatodoTask"),
-    tomatodoRestart: flag("tomatodoRestart"),
-    tomatodoPollMs: num("tomatodoPollMs", 300, 5000)
   };
 }
 
@@ -3481,85 +2847,6 @@ class ThinkerSettingTab extends PluginSettingTab {
       });
     });
 
-    containerEl.createEl("h3", { text: t("settings.tomatodo") });
-
-    new Setting(containerEl)
-      .setName(t("settings.tdEnabled"))
-      
-      .addToggle((toggle) =>
-        toggle.setValue(settings.tomatodoEnabled).onChange((value) => {
-          settings.tomatodoEnabled = value;
-          commit();
-          this.plugin.restartTomatodo();
-          new Notice(t(value ? "notice.thinkersOn" : "notice.thinkersOff"));
-        })
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.tdExe"))
-      
-      .addText((text) => {
-        text.setValue(settings.tomatodoExe);
-        text.onChange((value) => {
-          settings.tomatodoExe = value.trim();
-          commit();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t("settings.tdPort"))
-      
-      .addText((text) => {
-        text.inputEl.type = "number";
-        text.setValue(String(settings.tomatodoPort));
-        text.onChange((value) => {
-          const parsed = Number(value);
-          if (!Number.isFinite(parsed)) return;
-          settings.tomatodoPort = Math.min(65535, Math.max(1024, Math.round(parsed)));
-          commit();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t("settings.tdTask"))
-      
-      .addText((text) => {
-        text.setValue(settings.tomatodoTask);
-        text.onChange((value) => {
-          settings.tomatodoTask = value.trim();
-          commit();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t("settings.tdRestart"))
-      
-      .addToggle((toggle) =>
-        toggle.setValue(settings.tomatodoRestart).onChange((value) => {
-          settings.tomatodoRestart = value;
-          commit();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.tdPoll"))
-      
-      .addText((text) => {
-        text.inputEl.type = "number";
-        text.setValue(String(settings.tomatodoPollMs));
-        text.onChange((value) => {
-          const parsed = Number(value);
-          if (!Number.isFinite(parsed)) return;
-          settings.tomatodoPollMs = Math.min(5000, Math.max(300, Math.round(parsed)));
-          commit();
-          this.plugin.restartTomatodo();
-        });
-      });
-
-    new Setting(containerEl).addButton((btn) =>
-      btn.setButtonText(t("settings.tdTest")).onClick(() => void this.plugin.checkTomatodo())
-    );
-
     containerEl.createEl("h3", { text: t("settings.about") });
     containerEl.createEl("p", { text: `Thinker ${this.plugin.manifest.version}` });
   }
@@ -3575,7 +2862,6 @@ class ThinkerPlugin extends Plugin {
     this.index = null;
     this.storage = null;
     this.engine = null;
-    this.bridge = null;
     this.tdHandle = null;
     this.tdMirroring = false;
     this.tdRetryAfter = 0;
@@ -3593,7 +2879,6 @@ class ThinkerPlugin extends Plugin {
       () => this.settings,
       debounce(() => this.refreshNoteViews(), 400)
     );
-    this.bridge = new TomatodoBridge(() => this.settings);
     this.engine = new TimerEngine(() => this.settings, this.buildHooks());
 
     console.log("[Thinker] build " + BUILD);
@@ -3656,7 +2941,6 @@ class ThinkerPlugin extends Plugin {
     this.index.rebuild();
     this.refreshAll();
     this.registerVaultEvents();
-    this.restartTomatodo();
     if (this.settings.collapseLeftSidebar) this.collapseLeftSidebar();
     if (this.settings.openOnStartup) void this.openHome(true);
   }
@@ -3910,7 +3194,6 @@ class ThinkerPlugin extends Plugin {
       callback: () => void openDiary(this.app, diaryConfig(this.app, this.settings), todayKey())
     });
     this.addCommand({ id: "open-stats", name: t("cmd.stats"), callback: () => void this.openStats() });
-    this.addCommand({ id: "check-tomatodo", name: t("cmd.checkLink"), callback: () => void this.checkTomatodo() });
   }
 
   updateStatus() {
@@ -3925,60 +3208,7 @@ class ThinkerPlugin extends Plugin {
     this.statusBar.setText(`${prefix}${formatClock(value)}`);
   }
 
-  /* -------------------------------------------------- TomaTodo mirror loop */
 
-  restartTomatodo() {
-    if (this.tdHandle !== null) {
-      window.clearInterval(this.tdHandle);
-      this.tdHandle = null;
-    }
-    if (!this.settings.tomatodoEnabled || !Platform.isDesktop) {
-      if (this.tdMirroring) {
-        this.tdMirroring = false;
-        void this.bridge.stop();
-      }
-      return;
-    }
-    const interval = Math.max(300, Math.round(this.settings.tomatodoPollMs));
-    this.tdHandle = window.setInterval(() => this.pollTomatodo(), interval);
-  }
-
-  pollTomatodo() {
-    if (!this.settings.tomatodoEnabled) return;
-    const snapshot = this.engine.snapshot();
-    const active = snapshot.state !== "idle" && snapshot.mode === "stopwatch";
-    if (active === this.tdMirroring) return;
-    if (active && Date.now() < this.tdRetryAfter) return;
-    this.settleTomatodo(active);
-  }
-
-  settleTomatodo(active) {
-    this.tdMirroring = active;
-    const task = active ? this.bridge.start() : this.bridge.stop();
-    void task.then((outcome) => {
-      if (!outcome.ok) {
-        if (active) {
-          this.tdMirroring = false;
-          this.tdRetryAfter = Date.now() + 30000;
-        }
-        if (!this.tdNoticed.has(outcome.state)) {
-          this.tdNoticed.add(outcome.state);
-          new Notice(`TomaTodo: ${outcome.state}`, 8000);
-        }
-      } else if (outcome.ok) {
-        this.tdNoticed.clear();
-      }
-    });
-  }
-
-  async checkTomatodo() {
-    if (!this.settings.tomatodoEnabled) {
-      new Notice(t("notice.thinkersOff"));
-      return;
-    }
-    const outcome = await this.bridge.check();
-    new Notice(outcome.ok ? `TomaTodo: ok${outcome.detail ? " · " + outcome.detail : ""}` : `TomaTodo: ${outcome.state}`, 8000);
-  }
 }
 
 module.exports = ThinkerPlugin;

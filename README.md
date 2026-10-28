@@ -3,27 +3,45 @@
 A start page for an Obsidian vault: a clock, the notes as an outline, a focus
 timer, and a month of focus history.
 
-## What it does
+## Installation
 
-- **Clock.** Time and date at the top. Optional seconds.
-- **Notes as an outline.** Folders are labels above their notes; depth is carried
-  by label size and colour, so every note starts on the same left edge. Click a
-  folder to fold its branch. Typing switches the list to flat search results.
-- **Focus timer.** Pomodoro and stopwatch on the same ring. Click the digits to
-  start, again to end. Sessions are written to one Markdown file per day.
-- **Calendar.** A month of focus, shaded by minutes. Clicking a day opens its
-  records; records can be added, edited and deleted there.
-- **Statistics.** A right-sidebar panel with day, week and month views, a bar
-  chart or heat grid, and a breakdown of time per label.
+**From the community list**
+
+1. Open `Settings → Community plugins → Browse`.
+2. Search for `Thinker`, choose `Install`, then `Enable`.
+
+**Manually, from a release**
+
+1. Download `main.js`, `manifest.json` and `styles.css` from the latest release.
+2. Create the folder `<your vault>/.obsidian/plugins/thinker/` and put the three
+   files in it. The folder name must match `thinker` in `manifest.json`.
+3. Restart Obsidian, then enable **Thinker** in `Settings → Community plugins`.
+
+## Usage
+
+1. **Open the page.** It opens on startup when no note is open. You can also click
+   the house icon in the left ribbon, or run `Thinker: Open home page`.
+2. **Read the list.** Folders are headings, notes sit under them. Pick a range at
+   the top: `All`, `Recent`, `Pinned`. Choosing a folder shows its own notes and
+   folds the subfolders into headings; clicking `+` creates a note.
+3. **Search.** The field sits under the list. Type to filter by title, alias and
+   heading; `↑ ↓` to select, `Enter` to open, `Ctrl/Cmd + Enter` to create a note
+   from what you typed, `Esc` to clear.
+4. **Run a session.** Click the digits inside the ring to start, click again to
+   end. `Pause` and `End` appear while a session runs. Every session is written to
+   `FocusLog/<year>/<date>.md`.
+5. **Check the month.** Click a day in the calendar to see, add, edit or delete
+   that day's sessions, and to open or create its diary note.
+6. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
+   the statistics panel in the right sidebar. It switches between day, week and
+   month, and lists where the time went.
 
 ## Requirements and permissions
 
-- Desktop only. The optional TomaTodo link starts a local client with a debugging
-  port, which needs `child_process`.
-- Reads the vault to build the note index. Writes only two kinds of file: the
-  daily focus log under the configured folder, and new notes the user asks for.
-- The TomaTodo link is off by default. When it is off, the plugin starts no
-  process, opens no port and runs no timer.
+- Desktop only in this release.
+- Reads the vault to build the note index. Writes two kinds of file: the daily
+  focus log under the configured folder, and notes the user asks for.
+- No network access, no external process, no telemetry.
 
 ## Data
 
@@ -46,7 +64,7 @@ Licensed under the MIT License.
 # Thinker
 
 Obsidian 起始页插件。单页包含时钟、笔记、计时与日历四个区域。
-计时与记录格式沿用 Thinkers，历史数据直接可用。番茄ToDo 联动已并入，默认关闭。
+计时与记录格式沿用 Thinkers，历史数据直接可用。
 
 ## 安装
 
@@ -127,7 +145,6 @@ English                 1
 - `Thinker: 添加记录`
 - `Thinker: 打开今日日记`
 - `Thinker: 打开专注统计`
-- `Thinker: 检查番茄ToDo 连接`
 
 左侧功能区两个入口：房屋图标打开主页，柱状图标在右栏打开统计。
 
@@ -175,19 +192,9 @@ rest-count: 0
 ```
 ```
 
-## 番茄ToDo 联动
-
-仅联动正计时，番茄钟不受影响。启用前需完成三项准备：
-
-1. 在番茄ToDo 客户端创建待办，名称与设置中「关联待办」完全一致（默认 `专注`），计时类型设为正计时。
-2. 客户端完成手机绑定，否则列表页不可用。
-3. 设置中填写 `TomaToDo.exe` 的完整路径。
-
-实现方式为带调试端口启动客户端，再通过页面控制开始与停止。客户端更新内部结构后可能失效；失效时在设置中点击「检查连接」查看中断环节。
-
 ## 已知限制
 
-- 仅支持桌面端，联动依赖 `child_process`。
+- 本版本仅支持桌面端。
 - 全文搜索在后台分块读取文件。库较大时首次建立缓存需要等待，期间标题搜索正常可用。
 - 记录按日整文件重写。多台设备同时修改同一天时，以最后写入为准。
 - 分类依据文件夹，不读取标签。库根目录下的笔记归入「根目录」。
