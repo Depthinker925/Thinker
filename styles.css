@@ -258,8 +258,10 @@
 	color: var(--tk-accent);
 }
 
+/* The open range is the accent itself, not just the line under it: with folders on
+   the row, the line alone was too quiet to say which one is open. */
 .thinker-chip.is-on {
-	color: var(--text-normal);
+	color: var(--tk-accent);
 	box-shadow: inset 0 -2px 0 var(--tk-accent);
 }
 
@@ -1370,6 +1372,7 @@
 .thinker-timer .thinker-phase.is-switch:hover,
 .thinker-cal .thinker-cal-btn:hover,
 .thinker-modal .thinker-day-btn:hover,
+.thinker-modal .thinker-create-kind:hover,
 .thinker-modal .thinker-day-add:hover,
 .thinker-modal .thinker-day-diary:hover,
 .thinker-modal .setting-item-control button:hover,
@@ -1388,4 +1391,163 @@
    smaller gap so 全部 最近 收藏 still read as one group. */
 .thinker-chips .thinker-new {
 	margin-left: calc(var(--tk-2) - var(--tk-5));
+}
+
+/* ---------- the new-item dialog ----------
+
+   Two questions in the order they are asked: what is it, and where does it go.
+   The kind is a two-word switch, the name is the only field, and the place is the
+   vault's outline. Levels are sizes, so no row is pushed to the right. */
+
+/* Two classes: `.modal` carries its own width, and one class is not enough to
+   settle the tie. */
+.modal.thinker-create-modal {
+	width: min(460px, 92vw);
+	max-width: 92vw;
+}
+
+.thinker-create-kinds {
+	display: flex;
+	align-items: baseline;
+	gap: var(--tk-4);
+	padding-bottom: var(--tk-3);
+	border-bottom: 0.5px solid var(--tk-hair);
+}
+
+.thinker-modal .thinker-create-kind {
+	padding: 0;
+	border: none;
+	background: none;
+	box-shadow: none;
+	font-family: inherit;
+	font-size: var(--tk-fs-sm);
+	font-weight: inherit;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color var(--tk-dur) var(--tk-ease);
+}
+
+.thinker-modal .thinker-create-kind:hover {
+	color: var(--tk-accent);
+}
+
+.thinker-modal .thinker-create-kind.is-on {
+	color: var(--tk-accent);
+	font-weight: var(--font-semibold, 600);
+}
+
+.thinker-create-field {
+	display: flex;
+	align-items: center;
+	height: 34px;
+	margin: var(--tk-4) 0 var(--tk-3);
+	padding: 0 var(--tk-3);
+	border: 0.5px solid var(--tk-hair);
+	border-radius: var(--tk-r-sm);
+	transition: border-color var(--tk-dur) var(--tk-ease);
+}
+
+.thinker-create-field:focus-within {
+	border-color: var(--tk-accent);
+}
+
+/* Two classes, for the same reason as the search field: themes ship
+   input[type="text"] { width: 100% }, which would push it out of the box. */
+.thinker-modal .thinker-create-name,
+.thinker-modal .thinker-create-name:focus {
+	flex: 1 1 0;
+	width: auto;
+	max-width: 100%;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: none;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	font-family: inherit;
+	font-size: var(--tk-fs-md);
+	color: var(--text-normal);
+}
+
+.thinker-modal .thinker-create-name::placeholder {
+	color: var(--text-faint);
+}
+
+.thinker-create-label {
+	padding-bottom: var(--tk-1);
+	font-size: var(--tk-fs-xs);
+	letter-spacing: 0.09em;
+	color: var(--text-faint);
+}
+
+.thinker-pick {
+	max-height: 232px;
+	overflow-y: auto;
+	scrollbar-width: thin;
+}
+
+.thinker-pick-row {
+	display: flex;
+	align-items: baseline;
+	gap: var(--tk-2);
+	padding: 5px var(--tk-2);
+	border-radius: var(--tk-r-sm);
+	cursor: pointer;
+	transition: background-color var(--tk-dur) var(--tk-ease);
+}
+
+.thinker-pick-row:hover {
+	background: var(--tk-fill);
+}
+
+.thinker-pick-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: var(--tk-fs-md);
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	transition: color var(--tk-dur) var(--tk-ease);
+}
+
+.thinker-pick-row.is-level-2 .thinker-pick-name {
+	font-size: var(--tk-fs-sm);
+	color: var(--text-muted);
+}
+
+.thinker-pick-row.is-level-3 .thinker-pick-name {
+	font-size: var(--tk-fs-xs);
+	color: var(--text-faint);
+}
+
+/* The chosen row says it in the accent itself. The fill alone was not enough:
+   a level-2 row is muted by design, so a tinted background read as a hover state
+   rather than as the current choice. Four classes, so no level rule can win. */
+.thinker-modal .thinker-pick-row.is-on {
+	background: color-mix(in srgb, var(--tk-accent) 8%, transparent);
+}
+
+/* Five classes deep: a theme that styles rows inside a modal cannot outrank this,
+   and the inline colour the dialog sets covers the rest. */
+.thinker-modal .thinker-pick .thinker-pick-row.is-on .thinker-pick-name {
+	color: var(--tk-accent);
+	font-weight: var(--font-medium, 500);
+}
+
+/* A 2px marker down the left edge, so the choice is visible even in a monochrome
+   theme where the accent happens to be a grey. */
+.thinker-modal .thinker-pick .thinker-pick-row.is-on {
+	box-shadow: inset 2px 0 0 var(--tk-accent);
+}
+
+.thinker-create-actions {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--tk-4);
+	margin-top: var(--tk-4);
+	padding-top: var(--tk-3);
+	border-top: 0.5px solid var(--tk-hair);
 }

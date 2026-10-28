@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "2.2.1028 · review pass";
+const BUILD = "2.4.1028 · index sheet";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -46,6 +46,7 @@ const EN = {
   "stats.share": "Where it went",
   "ribbon.home": "Thinker",
   "ribbon.stats": "Focus statistics",
+  "ribbon.settings": "Thinker settings",
   "cmd.stats": "Open focus statistics",
 
   "notes.placeholder": "Search {count} notes",
@@ -55,6 +56,14 @@ const EN = {
   "notes.root": "Root",
   "notes.direct": "Direct",
   "notes.new": "New note",
+  "create.title": "New",
+  "create.note": "Note",
+  "create.folder": "Folder",
+  "create.noteName": "Note name",
+  "create.folderName": "Folder name",
+  "create.where": "Place",
+  "create.make": "Create",
+  "create.exists": "That name is taken",
   "notes.hint": "Up/Down to pick, Enter to open",
   "notes.empty": "No note matches",
   "notes.createNamed": "Create \"{name}\"",
@@ -202,6 +211,7 @@ const ZH = {
   "stats.share": "构成",
   "ribbon.home": "Thinker",
   "ribbon.stats": "专注统计",
+  "ribbon.settings": "Thinker 设置",
   "cmd.stats": "打开专注统计",
 
   "notes.placeholder": "搜索 {count} 篇笔记",
@@ -211,6 +221,14 @@ const ZH = {
   "notes.root": "根目录",
   "notes.direct": "顶层",
   "notes.new": "新建笔记",
+  "create.title": "新建",
+  "create.note": "笔记",
+  "create.folder": "文件夹",
+  "create.noteName": "笔记名称",
+  "create.folderName": "文件夹名称",
+  "create.where": "位置",
+  "create.make": "创建",
+  "create.exists": "已有同名项",
   "notes.hint": "↑↓ 选择 · Enter 打开",
   "notes.empty": "没有匹配的笔记",
   "notes.createNamed": "新建「{name}」",
@@ -646,30 +664,51 @@ class NoteIndex {
     this.updateOne(file);
   }
 
-  categories() {
+  /* Every folder in the vault, empty ones included and counting everything filed
+     below it. The new-item dialog has to offer a destination that holds nothing
+     yet, so this reads the vault rather than the note list. */
+  folders() {
+    const hidden = this.hiddenFolders();
+    const roots = parseLines(this.getSettings().indexRoots).map((root) => root.toLowerCase());
     const counts = new Map();
     for (const entry of this.entries) {
-      const key = entry.folder || "";
-      counts.set(key, (counts.get(key) || 0) + 1);
+      const dir = entry.parent || "";
+      if (!dir) continue;
+      const parts = dir.split("/");
+      for (let i = 1; i <= parts.length; i++) {
+        const path = parts.slice(0, i).join("/");
+        counts.set(path, (counts.get(path) || 0) + 1);
+      }
     }
-    const list = Array.from(counts.entries())
-      .map(([key, count]) => ({ key, label: key || t("notes.root"), count }))
-      .sort((a, b) => b.count - a.count);
-    return list;
-  }
 
-  /* The folders one level down from a top category, empty string meaning "filed
-     directly in the category". Only the buckets that exist are returned. */
-  subcategories(category) {
-    const counts = new Map();
-    for (const entry of this.entries) {
-      if ((entry.folder || "") !== category) continue;
-      const key = entry.sub || "";
-      counts.set(key, (counts.get(key) || 0) + 1);
+    const keep = (path) => {
+      if (!path || path === "/" || isIgnoredPath(path)) return false;
+      if (hidden.some((skip) => path === skip || path.startsWith(skip + "/"))) return false;
+      if (roots.length === 0) return true;
+      const lower = path.toLowerCase();
+      return roots.some((root) => lower === root || lower.startsWith(root + "/"));
+    };
+
+    const out = [];
+    const seen = new Set();
+    const loaded = this.app.vault.getAllLoadedFiles ? this.app.vault.getAllLoadedFiles() : [];
+    for (const item of loaded) {
+      if (!item || !Array.isArray(item.children)) continue;
+      if (!keep(item.path) || seen.has(item.path)) continue;
+      seen.add(item.path);
+      out.push({
+        path: item.path,
+        name: item.name || item.path.split("/").pop(),
+        depth: item.path.split("/").length,
+        count: counts.get(item.path) || 0
+      });
     }
-    return Array.from(counts.entries())
-      .map(([key, count]) => ({ key, label: key || t("notes.direct"), count }))
-      .sort((a, b) => (a.key === "" ? 1 : b.key === "" ? -1 : b.count - a.count));
+    for (const path of counts.keys()) {
+      if (seen.has(path) || !keep(path)) continue;
+      seen.add(path);
+      out.push({ path, name: path.split("/").pop(), depth: path.split("/").length, count: counts.get(path) || 0 });
+    }
+    return out.sort((a, b) => a.path.localeCompare(b.path, "zh"));
   }
 
   pinnedPaths() {
@@ -1277,8 +1316,11 @@ class NotePanel {
       { key: "recent", label: t("notes.recent"), count: null },
       { key: "pinned", label: t("notes.pinned"), count: pinned || null }
     ];
-    for (const cat of this.deps.index.categories()) {
-      items.push({ key: cat.key, label: cat.label, count: cat.count });
+    /* Top-level folders, empty ones included: a folder someone just made should
+       appear here at once, without waiting for a note to be filed in it. */
+    for (const folder of this.deps.index.folders()) {
+      if (folder.depth !== 1) continue;
+      items.push({ key: folder.path, label: folder.name, count: folder.count || null });
     }
     if (this.category !== "all" && this.category !== "recent" && this.category !== "pinned") {
       const known = items.some((item) => item.key === this.category);
@@ -1303,9 +1345,9 @@ class NotePanel {
     /* The plus follows the last range instead of floating at the far right: with
        folders it ends up after the folders, without folders after 收藏. */
     this.newBtn = chips.createEl("button", { cls: "thinker-new", text: "+" });
-    this.newBtn.setAttribute("aria-label", t("notes.new"));
-    this.newBtn.setAttribute("title", t("notes.new"));
-    this.newBtn.addEventListener("click", () => this.createFromQuery());
+    this.newBtn.setAttribute("aria-label", t("create.title"));
+    this.newBtn.setAttribute("title", t("create.title"));
+    this.newBtn.addEventListener("click", () => this.openCreate());
   }
 
   /* Only shown for a real folder, and only when there is something to choose
@@ -1498,6 +1540,26 @@ class NotePanel {
         })
     );
     menu.showAtMouseEvent(evt);
+  }
+
+  /* The plus asks two things the search field cannot: which kind, and where. Both
+     are answered in one dialog, so a new note does not land in the wrong place
+     just because a filter happened to be on. */
+  openCreate() {
+    const virtual = this.category === "all" || this.category === "recent" || this.category === "pinned";
+    const roots = parseLines(this.deps.getSettings().indexRoots);
+    const dir = virtual ? roots[0] || "" : this.category;
+    new CreateModal(
+      { app: this.deps.app, index: this.deps.index },
+      { name: (this.input.value || "").trim(), dir },
+      (result) => {
+        this.input.value = "";
+        this.pendingQuery = "";
+        if (result.kind === "folder") this.category = result.path;
+        this.renderChips();
+        this.refreshRows();
+      }
+    ).open();
   }
 
   async createFromQuery() {
@@ -1941,6 +2003,176 @@ async function openDiary(app, config, dayKey) {
 }
 
 /* --------------------------------------------------------------- 11  Modals */
+
+/* Creates every folder on the way to a path. vault.createFolder does not make the
+   parents, and a nested destination is the ordinary case here. */
+async function ensureFolder(app, path) {
+  if (!path) return;
+  const parts = path.split("/");
+  for (let i = 1; i <= parts.length; i++) {
+    const part = parts.slice(0, i).join("/");
+    if (!app.vault.getAbstractFileByPath(part)) await app.vault.createFolder(part);
+  }
+}
+
+/* One dialog for both new things. A note and a folder differ in one field, so the
+   type is a two-word switch at the top; where it goes is picked from the vault's
+   own outline, with the level carried by size instead of indentation. */
+class CreateModal extends Modal {
+  constructor(deps, options, onDone) {
+    super(deps.app);
+    this.deps = deps;
+    this.kind = "note";
+    this.name = (options && options.name) || "";
+    this.dir = (options && options.dir) || "";
+    this.onDone = onDone;
+    this.picks = [];
+  }
+
+  onOpen() {
+    this.contentEl.addClass("thinker-modal");
+    this.modalEl.addClass("thinker-modal");
+    this.modalEl.addClass("thinker-create-modal");
+    this.titleEl.setText(t("create.title"));
+    this.render();
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+
+  render() {
+    const content = this.contentEl;
+    content.empty();
+    this.picks = [];
+
+    const kinds = content.createDiv({ cls: "thinker-create-kinds" });
+    for (const kind of ["note", "folder"]) {
+      const btn = kinds.createEl("button", {
+        cls: kind === this.kind ? "thinker-create-kind is-on" : "thinker-create-kind",
+        text: t(kind === "note" ? "create.note" : "create.folder")
+      });
+      btn.addEventListener("click", () => {
+        if (this.kind === kind) return;
+        this.kind = kind;
+        this.render();
+      });
+    }
+
+    const field = content.createDiv({ cls: "thinker-create-field" });
+    const input = field.createEl("input", {
+      cls: "thinker-create-name",
+      attr: {
+        type: "text",
+        spellcheck: "false",
+        autocomplete: "off",
+        placeholder: this.kind === "note" ? t("create.noteName") : t("create.folderName")
+      }
+    });
+    input.value = this.name;
+    input.addEventListener("input", () => {
+      this.name = input.value;
+    });
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        void this.submit();
+      }
+    });
+    this.input = input;
+
+    content.createDiv({ cls: "thinker-create-label", text: t("create.where") });
+    const tree = content.createDiv({ cls: "thinker-pick" });
+    let selected = null;
+    const items = [{ path: "", name: t("notes.root"), depth: 1 }];
+    for (const folder of this.deps.index.folders()) {
+      items.push({ path: folder.path, name: folder.name, depth: folder.depth });
+    }
+    for (const item of items) {
+      const level = Math.min(3, Math.max(1, item.depth));
+      const row = tree.createDiv({
+        cls: this.dir === item.path ? "thinker-pick-row is-on is-level-" + level : "thinker-pick-row is-level-" + level
+      });
+      row.setAttribute("title", item.path || t("notes.root"));
+      const label = row.createSpan({ cls: "thinker-pick-name", text: item.name });
+      row.addEventListener("click", () => this.selectDir(item.path));
+      this.picks.push({ row, label, path: item.path });
+      if (this.dir === item.path) selected = row;
+    }
+
+    const actions = content.createDiv({ cls: "thinker-create-actions" });
+    const cancel = actions.createEl("button", { cls: "thinker-day-btn", text: t("modal.cancel") });
+    cancel.addEventListener("click", () => this.close());
+    const ok = actions.createEl("button", { cls: "thinker-day-btn is-accent", text: t("create.make") });
+    ok.addEventListener("click", () => void this.submit());
+
+    this.selectDir(this.dir);
+    input.focus();
+    const end = input.value.length;
+    if (input.setSelectionRange) input.setSelectionRange(end, end);
+    /* The chosen folder can sit far down a long outline; bring it into view so the
+       dialog opens showing where the note is about to land. */
+    if (selected && selected.scrollIntoView) selected.scrollIntoView({ block: "nearest" });
+  }
+
+  /* The chosen row is marked three ways on purpose: the class drives the shared
+     look, the inline colour survives any selector a theme might throw at it, and
+     the marker runs down the left edge so the state reads at a glance. Toggling
+     through classList.add / remove rather than the Obsidian helper, because this
+     ran as a silent no-op once already. */
+  selectDir(path) {
+    this.dir = path;
+    for (const pick of this.picks) {
+      const on = pick.path === path;
+      if (pick.row && pick.row.classList) {
+        if (on) pick.row.classList.add("is-on");
+        else pick.row.classList.remove("is-on");
+      }
+      if (pick.label && pick.label.style) {
+        pick.label.style.color = on ? "var(--tk-accent)" : "";
+      }
+    }
+  }
+
+  async submit() {
+    const app = this.deps.app;
+    const name = String(this.name || "").trim();
+    if (!name) {
+      if (this.input) this.input.focus();
+      return;
+    }
+    const dir = this.dir;
+    try {
+      if (this.kind === "folder") {
+        const path = dir ? dir + "/" + name : name;
+        if (app.vault.getAbstractFileByPath(path)) {
+          new Notice(t("create.exists"));
+          return;
+        }
+        await ensureFolder(app, path);
+        this.close();
+        if (this.onDone) this.onDone({ kind: "folder", path });
+        return;
+      }
+
+      await ensureFolder(app, dir);
+      let path = dir ? dir + "/" + name + ".md" : name + ".md";
+      let counter = 2;
+      while (app.vault.getAbstractFileByPath(path)) {
+        path = dir ? dir + "/" + name + " " + counter + ".md" : name + " " + counter + ".md";
+        counter += 1;
+      }
+      const file = await app.vault.create(path, "");
+      this.close();
+      if (this.onDone) this.onDone({ kind: "note", path, file });
+      await app.workspace.getLeaf(false).openFile(file);
+    } catch (error) {
+      new Notice(String(error && error.message ? error.message : error));
+    }
+  }
+}
+
+
 
 class RenameModal extends Modal {
   constructor(app, file, onDone) {
@@ -2888,6 +3120,7 @@ class ThinkerPlugin extends Plugin {
     this.addCommands();
     this.addRibbonIcon("home", t("ribbon.home"), () => void this.openHome(false));
     this.addRibbonIcon("bar-chart-2", t("ribbon.stats"), () => void this.openStats());
+    this.addRibbonIcon("settings", t("ribbon.settings"), () => this.openSettings());
 
     if (Platform.isDesktop) {
       this.statusBar = this.addStatusBarItem();
@@ -3070,6 +3303,18 @@ class ThinkerPlugin extends Plugin {
     for (const view of this.statsViews()) view.refresh();
   }
 
+  /* The gear goes straight to this plugin's tab instead of the settings root:
+     two clicks between the page and its options were one too many. */
+  openSettings() {
+    const setting = this.app.setting;
+    if (!setting || typeof setting.open !== "function") {
+      this.app.commands.executeCommandById("app:open-settings");
+      return;
+    }
+    setting.open();
+    if (typeof setting.openTabById === "function") setting.openTabById(this.manifest.id);
+  }
+
   async openStats() {
     const { workspace } = this.app;
     const existing = workspace.getLeavesOfType(STATS_VIEW_TYPE);
@@ -3238,6 +3483,8 @@ module.exports._internals = {
   TimerPanel,
   CalendarPanel,
   DayModal,
+  CreateModal,
+  ThinkerPlugin,
   RecordModal,
   openDiary,
   diaryPathFor

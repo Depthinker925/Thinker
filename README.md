@@ -23,18 +23,24 @@ timer, and a month of focus history.
    the house icon in the left ribbon, or run `Thinker: Open home page`.
 2. **Read the list.** Folders are headings, notes sit under them. Pick a range at
    the top: `All`, `Recent`, `Pinned`. Choosing a folder shows its own notes and
-   folds the subfolders into headings; clicking `+` creates a note.
-3. **Search.** The field sits under the list. Type to filter by title, alias and
+   folds the subfolders into headings.
+3. **Create something.** The `+` at the end of the range row opens one dialog for
+   both kinds: pick `Note` or `Folder`, type a name, then pick a place from the
+   vault's outline, where every folder is listed and that level is shown by text
+   size. The chosen folder's path is created if it does not exist yet.
+4. **Search.** The field sits under the list. Type to filter by title, alias and
    heading; `↑ ↓` to select, `Enter` to open, `Ctrl/Cmd + Enter` to create a note
    from what you typed, `Esc` to clear.
-4. **Run a session.** Click the digits inside the ring to start, click again to
+5. **Run a session.** Click the digits inside the ring to start, click again to
    end. `Pause` and `End` appear while a session runs. Every session is written to
    `FocusLog/<year>/<date>.md`.
-5. **Check the month.** Click a day in the calendar to see, add, edit or delete
+6. **Check the month.** Click a day in the calendar to see, add, edit or delete
    that day's sessions, and to open or create its diary note.
-6. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
+7. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
    the statistics panel in the right sidebar. It switches between day, week and
    month, and lists where the time went.
+8. **Change the settings.** The gear in the left ribbon opens Obsidian's settings
+   at this plugin's own tab, without going through the settings root.
 
 ## Requirements and permissions
 
@@ -120,6 +126,8 @@ English                 1
 
 设置 → 隐藏的文件夹 可排除指定目录，子目录一并排除，不进入索引。
 
+新建时点分类行末尾的 `+`，弹窗里有三件事：类型（笔记或文件夹）、名称、位置。位置按库内目录列出，空文件夹也会出现，层级高的字号大、层级低的字号小，不缩进。目标目录不存在时会逐级建好再放进去。
+
 ## 键盘
 
 | 位置 | 按键 | 行为 |
@@ -127,7 +135,10 @@ English                 1
 | 搜索框 | 输入 | 按标题、别名、小标题筛选；启用全文后包含正文 |
 | 搜索框 | ↑ ↓ | 选择 |
 | 搜索框 | Enter | 打开选中笔记 |
-| 搜索框 | Ctrl / Cmd + Enter | 以当前输入创建笔记 |
+| 搜索框 | Ctrl / Cmd + Enter | 以当前输入创建笔记，不弹窗 |
+| 分类行 + | 点击 | 弹窗选择新建笔记或文件夹，并指定位置 |
+| 弹窗 | Enter | 创建 |
+| 弹窗 | 点击位置行 | 更换新建位置 |
 | 搜索框 | Esc | 清空 |
 | 笔记行 | 点击 | 打开 |
 | 笔记行 | Ctrl / Cmd + 点击 | 新标签页打开 |
@@ -146,7 +157,7 @@ English                 1
 - `Thinker: 打开今日日记`
 - `Thinker: 打开专注统计`
 
-左侧功能区两个入口：房屋图标打开主页，柱状图标在右栏打开统计。
+左侧功能区三个入口：房屋图标打开主页，柱状图标在右栏打开统计，齿轮图标直接打开本插件的设置页。
 
 ## 计时
 
