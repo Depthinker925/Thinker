@@ -64,9 +64,7 @@ timer, and a month of focus history.
    that day's sessions, and to open or create its diary note.
 8. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
    the statistics panel in the right sidebar. It switches between day, week and
-   month, and lists where the time went. The month grid sits under the numbers:
-   click a day there and the panel turns to that day, so the two halves always
-   describe the same period.
+   month, and lists where the time went.
 9. **Change the settings.** The gear in the left ribbon opens Obsidian's settings
    at this plugin's own tab, without going through the settings root.
 
@@ -236,8 +234,6 @@ English                 1
 
 底部按标签汇总占比，最多五项，休息单列。
 
-再往下是一个可点击的月历，跟主页那块同一套：点一天，上面整页就切到那天。左右箭头翻月，与上面的周期互不牵制。
-
 图形与条形的颜色取自主题的强调色。旧版把这些颜色从一个固定层级的变量算出来，遇到把强调色定义在别处的主题就算不出颜色，柱形、热力、时间轴与构成条会整片变透明只剩数字。3.2.0 改为按主题实际定义的位置取值，并留了兜底色。
 
 笔记面板不用强调色，只用三级灰：分类行选中是字色加深加一道灰线，选中的笔记是灰描边，收藏是一道灰竖条，搜索框聚焦是灰边框。一列名字上再叠第二种颜色，要先学会它才能读，不值得。
@@ -249,7 +245,7 @@ English                 1
 | 笔记列表、分类行、搜索框 | 三级灰，无强调色 |
 | 计时器进度环 | 强调色 |
 | 主页日历 | 强调色（热力四档、今日格） |
-| 统计面板 | 强调色（柱形、热力、时间轴、构成条、底部月历） |
+| 统计面板 | 强调色（柱形、热力、时间轴、构成条） |
 
 ## 数据
 

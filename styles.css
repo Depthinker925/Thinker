@@ -1345,20 +1345,6 @@ body {
 	font-variant-numeric: tabular-nums;
 }
 
-/* ---------- the month grid under the numbers ----------
-   The start page sizes its grid by the pane it lives in; here the rows are a fixed
-   height, because this panel is read top to bottom and the numbers above do not
-   move when the grid below changes month. */
-
-.thinker-stats-cal {
-	padding-top: var(--tk-1);
-}
-
-.thinker-stats-cal .thinker-cal-grid {
-	height: auto;
-	grid-auto-rows: 26px;
-}
-
 /* ---------- narrow panes ----------
    A container query, not a window query: this page is often opened in a split,
    where the window is wide and the pane is not. */

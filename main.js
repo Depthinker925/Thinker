@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.2.3 · quiet selection";
+const BUILD = "3.2.4 · no stats calendar";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -44,7 +44,6 @@ const EN = {
   "stats.numbers": "Numbers",
   "stats.shape": "Shape",
   "stats.share": "Where it went",
-  "stats.calendar": "Month",
   "ribbon.home": "Thinker",
   "ribbon.stats": "Focus statistics",
   "ribbon.settings": "Thinker settings",
@@ -220,7 +219,6 @@ const ZH = {
   "stats.numbers": "数值",
   "stats.shape": "分布",
   "stats.share": "构成",
-  "stats.calendar": "月历",
   "ribbon.home": "Thinker",
   "ribbon.stats": "专注统计",
   "ribbon.settings": "Thinker 设置",
@@ -2005,15 +2003,6 @@ class CalendarPanel {
     this.label.setText(t("cal.title", { year: this.year, month: this.month }));
   }
 
-  /* Brings the grid to a given month, used when the page around it moves. */
-  setMonth(year, month) {
-    if (this.year === year && this.month === month) return;
-    this.year = year;
-    this.month = month;
-    if (this.label) this.label.setText(t("cal.title", { year: this.year, month: this.month }));
-    if (this.grid) void this.refresh();
-  }
-
   shift(delta) {
     this.month += delta;
     if (this.month < 1) {
@@ -2058,12 +2047,6 @@ class CalendarPanel {
       day.createSpan({ cls: "thinker-day-num", text: String(Number(key.slice(-2))) });
       day.createSpan({ cls: "thinker-day-dot" });
       day.addEventListener("click", () => {
-        /* A host that shows its own detail — the statistics panel, which turns the
-           page to that day — passes onPick and keeps the day modal out of the way. */
-        if (typeof this.deps.onPick === "function") {
-          this.deps.onPick(key);
-          return;
-        }
         new DayModal(this.deps, key, () => {
           void this.refresh();
           this.deps.onRecordsChanged();
@@ -2808,7 +2791,6 @@ class StatsView extends ItemView {
     this.mode = "week";
     this.anchor = todayKey();
     this.token = 0;
-    this.calendar = null;
   }
 
   getViewType() {
@@ -2911,35 +2893,6 @@ class StatsView extends ItemView {
     else this.renderMonthChart(root, period.keys, map);
 
     this.renderTags(root, records);
-    this.renderCalendar(root);
-  }
-
-  /* The same month grid as the start page, under the numbers. A day picked here is
-     what the page turns to, so the numbers above and the day below always agree. */
-  renderCalendar(root) {
-    root.createDiv({ cls: "thinker-stats-label", text: t("stats.calendar") });
-    const host = root.createDiv({ cls: "thinker-stats-cal" });
-    const date = parseDateKey(this.anchor);
-    if (!this.calendar) {
-      this.calendar = new CalendarPanel(host, {
-        storage: this.deps.storage,
-        getSettings: this.deps.getSettings,
-        onRecordsChanged: () => void this.render(),
-        onPick: (dayKey) => this.drill(dayKey)
-      });
-      this.calendar.year = date.getFullYear();
-      this.calendar.month = date.getMonth() + 1;
-      this.calendar.render();
-      return;
-    }
-    /* The page was rebuilt, so the calendar's host element is a new node. The shell
-       is drawn again on it and the month is read again, which keeps the grid in step
-       with the period the numbers above are describing. */
-    this.calendar.root = host;
-    this.calendar.year = date.getFullYear();
-    this.calendar.month = date.getMonth() + 1;
-    this.calendar.renderShell();
-    void this.calendar.refresh();
   }
 
   renderHead(root, period) {
