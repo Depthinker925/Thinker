@@ -51,7 +51,11 @@ timer, and a month of focus history.
    from what you typed, `Esc` to clear.
 6. **Run a session.** Click the digits inside the ring to start, click again to
    end. `Pause` and `End` appear while a session runs. Every session is written to
-   `FocusLog/<year>/<date>.md`.
+   `FocusLog/<year>/<date>.md`. The clock keeps its own time: with the window
+   minimised, the machine asleep, or Obsidian closed outright, the seconds still
+   accrue and are added back the moment the page returns, still running. An
+   interruption longer than twelve hours is not counted, so a timer left running
+   overnight is not filed as a night-long session.
 7. **Check the month.** Click a day in the calendar to see, add, edit or delete
    that day's sessions, and to open or create its diary note.
 8. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
@@ -203,7 +207,7 @@ English                 1
 
 支持番茄钟与正计时。番茄钟完成后生成一条记录，达到设定轮数进入长休息。自动进入下一阶段可关闭。
 
-关闭 Obsidian 不影响记录准确性。再次打开时按关闭时刻结算；若该段已完成，直接补记。
+计时自己走：窗口最小化、系统休眠、或 Obsidian 被关掉，秒数照常累加，页面回来时补齐并接着跑。中断超过十二小时不再补，所以忘关的计时器不会变成一整夜的记录。
 
 结束后默认询问本次内容，填写内容作为标签，统计按标签汇总。可在设置中关闭。
 

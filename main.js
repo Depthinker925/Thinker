@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.0.0 · tab order";
+const BUILD = "3.1.0 · background clock";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -126,6 +126,7 @@ const EN = {
   "notice.saved": "Saved {duration}",
   "notice.tooShort": "Session shorter than {seconds}s was not saved",
   "notice.recovered": "A session that ended while Obsidian was closed was saved",
+  "notice.resumed": "Timer kept running in the background · {duration} so far",
   "notice.breakDone": "Break is over",
 
   "cmd.home": "Open the Thinker home page",
@@ -298,6 +299,7 @@ const ZH = {
   "notice.saved": "已记录 {duration}",
   "notice.tooShort": "不足 {seconds} 秒，没有记录",
   "notice.recovered": "关闭 Obsidian 期间结束的那一段已经补记",
+  "notice.resumed": "计时在后台继续 · 已计 {duration}",
   "notice.breakDone": "休息结束",
 
   "cmd.home": "打开 Thinker 主页",
@@ -1057,6 +1059,13 @@ function vibrate() {
   if (navigator.vibrate) navigator.vibrate(90);
 }
 
+/* A session survives the window that was watching it. When Obsidian is closed,
+ * minimised past the point of being counted, or the machine sleeps, the runtime on
+ * disk keeps its last wall-clock reading; the gap is added back on the next load.
+ * A gap beyond this limit is read as "the timer was left running overnight" and is
+ * not counted, so a night away cannot become a nine hour record. */
+const BACKGROUND_GAP_LIMIT_SEC = 12 * 3600;
+
 /* Elapsed time is always derived from timestamps, never from a counter, so a
  * sleeping or throttled window cannot drift. */
 class TimerEngine {
@@ -1126,7 +1135,7 @@ class TimerEngine {
     if (elapsed >= Math.max(0, settings.minSessionSeconds)) {
       this.record({
         start: this.sessionStart,
-        end: Date.now(),
+        end: this.sessionStart + elapsed * 1000,
         durationSec: elapsed,
         kind: this.phase === "focus" ? "focus" : "rest",
         phase: this.phase,
@@ -1138,11 +1147,13 @@ class TimerEngine {
     this.reset();
   }
 
+  /* Returns true when a phase ended during this tick. */
   tick() {
-    if (this.state !== "running") return;
-    if (this.mode !== "pomodoro" || !this.targetSec) return;
-    if (this.elapsedSec() < this.targetSec) return;
+    if (this.state !== "running") return false;
+    if (this.mode !== "pomodoro" || !this.targetSec) return false;
+    if (this.elapsedSec() < this.targetSec) return false;
     this.completePhase();
+    return true;
   }
 
   completePhase() {
@@ -1240,11 +1251,16 @@ class TimerEngine {
     };
   }
 
-  /* A timer that spans a restart is closed at the moment Obsidian was saved, not
-   * at the moment it is opened again, so a night away cannot become a 9 hour session. */
+  /* A session survives the window that was watching it. A timer saved while running
+   * is put back on the wall clock: the time Obsidian spent closed, minimised away or
+   * asleep is added to what was already counted, and the session keeps running. Only
+   * a gap past BACKGROUND_GAP_LIMIT_SEC is dropped, which is what keeps a night away
+   * from turning into a nine hour record. */
   restore(runtime) {
     if (!runtime || typeof runtime !== "object") return "idle";
     const saved = Number(runtime.accumulatedSec) || 0;
+    const savedAt = Number(runtime.savedAt) || 0;
+    const wasRunning = runtime.state === "running";
     this.mode = runtime.mode === "stopwatch" ? "stopwatch" : "pomodoro";
     this.round = Math.max(0, Math.round(Number(runtime.round) || 0));
     this.tag = typeof runtime.tag === "string" ? runtime.tag : "";
@@ -1257,9 +1273,15 @@ class TimerEngine {
       this.targetSec = this.mode === "pomodoro" ? Math.max(1, this.getSettings().focusMinutes) * 60 : 0;
       return "idle";
     }
-    this.accumulatedSec = saved;
-    this.state = "paused";
-    if (this.mode === "pomodoro" && this.targetSec > 0 && saved >= this.targetSec) {
+    /* The stretch that ran without a window in front of it. */
+    let gapSec = 0;
+    if (wasRunning && savedAt > 0) {
+      const raw = Math.max(0, (Date.now() - savedAt) / 1000);
+      if (raw <= BACKGROUND_GAP_LIMIT_SEC) gapSec = raw;
+    }
+    const carried = saved + gapSec;
+    this.accumulatedSec = carried;
+    if (this.mode === "pomodoro" && this.targetSec > 0 && carried >= this.targetSec) {
       this.record({
         start: this.sessionStart,
         end: this.sessionStart + Math.round(this.targetSec) * 1000,
@@ -1275,6 +1297,12 @@ class TimerEngine {
       this.targetSec = Math.max(1, this.getSettings().focusMinutes) * 60;
       return "completed";
     }
+    if (wasRunning && gapSec > 0) {
+      this.runFrom = Date.now();
+      this.state = "running";
+      return "resumed";
+    }
+    this.state = "paused";
     return "restored";
   }
 }
@@ -3321,6 +3349,7 @@ class ThinkerPlugin extends Plugin {
     this.tdRetryAfter = 0;
     this.tdNoticed = new Set();
     this.ready = false;
+    this.lastPersistAt = 0;
   }
 
   async onload() {
@@ -3351,10 +3380,10 @@ class ThinkerPlugin extends Plugin {
 
     const restored = this.engine.restore(data && data.runtime);
     if (restored === "completed") new Notice(t("notice.recovered"));
+    else if (restored === "resumed") new Notice(t("notice.resumed", { duration: formatDuration(Math.round(this.engine.elapsedSec())) }));
 
-    this.registerInterval(window.setInterval(() => this.tick(), 1000));
+    this.startClock();
     const wake = () => {
-      this.engine.tick();
       this.tick();
     };
     window.addEventListener("visibilitychange", wake);
@@ -3365,6 +3394,42 @@ class ThinkerPlugin extends Plugin {
     });
 
     this.app.workspace.onLayoutReady(() => this.onReady());
+  }
+
+  /* Blink slows DOM timers to about one tick a minute, and stops them outright, once
+     the window is hidden — which is exactly when a focus session is being watched from
+     the other side of the screen. Node's timers are driven by libuv and keep their
+     cadence there, so the clock stays honest with the window minimised; a plain DOM
+     timer is only the fallback for builds where require is out of reach. Both are
+     wrapped: a throwing callback inside a Node timer would take the process down. */
+  startClock() {
+    let timers = null;
+    try {
+      if (typeof window !== "undefined" && typeof window.require === "function") {
+        timers = window.require("timers");
+      }
+    } catch (error) {
+      timers = null;
+    }
+    const beat = () => {
+      try {
+        this.tick();
+      } catch (error) {
+        console.error("Thinker: the clock tick failed", error);
+      }
+    };
+    if (timers && typeof timers.setInterval === "function" && typeof timers.clearInterval === "function") {
+      const handle = timers.setInterval(beat, 1000);
+      this.register(() => {
+        try {
+          timers.clearInterval(handle);
+        } catch (error) {
+          /* the timer process is already gone */
+        }
+      });
+      return;
+    }
+    this.registerInterval(window.setInterval(beat, 1000));
   }
 
   onunload() {
@@ -3482,9 +3547,27 @@ class ThinkerPlugin extends Plugin {
   }
 
   tick() {
-    this.engine.tick();
+    const ended = this.engine.tick();
     for (const view of this.homeViews()) view.onTick();
     this.updateStatus();
+    if (!ended) this.persistRuntime();
+  }
+
+  /* The runtime is written while it runs, not only when it changes. A phase that ends
+     already goes through onStateChange, which saves; this is for the ordinary seconds
+     in between, so a crash or a hard quit costs a few seconds instead of the whole
+     session. Five seconds is under the shortest sleep anyone takes. */
+  persistRuntime() {
+    if (!this.engine || this.engine.state !== "running") return;
+    const now = Date.now();
+    if (now - this.lastPersistAt < 5000) return;
+    this.lastPersistAt = now;
+    try {
+      const pending = this.saveSettings();
+      if (pending && typeof pending.catch === "function") pending.catch(() => {});
+    } catch (error) {
+      console.error("Thinker: could not save the runtime", error);
+    }
   }
 
   homeViews() {
