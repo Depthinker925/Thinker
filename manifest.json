@@ -1,7 +1,7 @@
 {
   "id": "thinker",
   "name": "Thinker",
-  "version": "3.1.0",
+  "version": "3.2.3",
   "minAppVersion": "1.13.0",
   "description": "A start page: a clock, your notes as an outline, a focus timer, and a month of focus history. Opens on startup and stays out of the way.",
   "author": "Depthinker",

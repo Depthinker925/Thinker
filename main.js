@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.1.0 · background clock";
+const BUILD = "3.2.3 · quiet selection";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -44,6 +44,7 @@ const EN = {
   "stats.numbers": "Numbers",
   "stats.shape": "Shape",
   "stats.share": "Where it went",
+  "stats.calendar": "Month",
   "ribbon.home": "Thinker",
   "ribbon.stats": "Focus statistics",
   "ribbon.settings": "Thinker settings",
@@ -93,6 +94,8 @@ const EN = {
   "timer.today": "{duration} today",
 
   "cal.title": "{year}-{month}",
+  "cal.prev": "Previous month",
+  "cal.next": "Next month",
   "cal.today": "Today",
   "cal.empty": "No session on this day",
   "cal.dayTotal": "{duration} focused",
@@ -217,6 +220,7 @@ const ZH = {
   "stats.numbers": "数值",
   "stats.shape": "分布",
   "stats.share": "构成",
+  "stats.calendar": "月历",
   "ribbon.home": "Thinker",
   "ribbon.stats": "专注统计",
   "ribbon.settings": "Thinker 设置",
@@ -266,6 +270,8 @@ const ZH = {
   "timer.today": "今日 {duration}",
 
   "cal.title": "{year} 年 {month} 月",
+  "cal.prev": "上个月",
+  "cal.next": "下个月",
   "cal.today": "今天",
   "cal.empty": "这一天还没有记录",
   "cal.dayTotal": "专注 {duration}",
@@ -776,7 +782,10 @@ class NoteIndex {
       }
       scored.push({ entry, score });
     }
-    const compare = sorterFor(this.getSettings().noteSort);
+    /* 全部, a folder and 收藏 are read in the order chosen in the settings. 最近 is
+       not: it is the last week's edits and its only useful order is the newest
+       first, otherwise it is 全部 with rows missing. */
+    const compare = category === "recent" ? sorterFor("time-desc") : sorterFor(this.getSettings().noteSort);
     scored.sort((a, b) => {
       if (q && b.score !== a.score) return b.score - a.score;
       return compare(a.entry, b.entry);
@@ -1324,6 +1333,7 @@ class NotePanel {
     this.results = [];
     this.rows = [];
     this.selected = 0;
+    this.keyboardNav = false;
     this.pendingQuery = "";
     this.reordering = false;
     this.dragging = null;
@@ -1578,6 +1588,8 @@ class NotePanel {
     }
     this.results = rows;
     if (this.selected >= rows.length) this.selected = Math.max(0, rows.length - 1);
+    /* A fresh list has no keyboard cursor: the tint only appears once a key moves it. */
+    this.keyboardNav = false;
     this.renderList();
   }
 
@@ -1646,7 +1658,6 @@ class NotePanel {
       row.createSpan({ cls: "thinker-note-when", text: relativeTime(entry.mtime) });
       const index = this.rows.length;
       this.rows.push(row);
-      if (index === this.selected) row.addClass("is-selected");
       row.addEventListener("click", (evt) => {
         this.selected = index;
         this.markSelection();
@@ -1687,9 +1698,14 @@ class NotePanel {
     this.markSelection();
   }
 
+  /* The tint belongs to the arrow keys, not to the panel. A row is chosen before any
+     key is pressed — the first one — and a list that opens with its top row filled in
+     reads as a block of colour sitting above an otherwise empty column. Nothing is
+     painted until the keyboard is actually used, and Enter still opens the first row
+     because the index starts at zero either way. */
   markSelection() {
     (this.rows || []).forEach((row, index) => {
-      if (row && row.toggleClass) row.toggleClass("is-selected", index === this.selected);
+      if (row && row.toggleClass) row.toggleClass("is-selected", this.keyboardNav === true && index === this.selected);
     });
   }
 
@@ -1719,7 +1735,12 @@ class NotePanel {
 
   move(delta) {
     if (this.rows.length === 0) return;
-    this.selected = (this.selected + delta + this.rows.length) % this.rows.length;
+    /* The cursor starts at zero so Enter opens the first row, which means the first
+       arrow press has to land on a row rather than step off it: down from before the
+       list lands on the first, up lands on the last. */
+    const from = this.keyboardNav === true ? this.selected : delta > 0 ? -1 : 0;
+    this.keyboardNav = true;
+    this.selected = (from + delta + this.rows.length) % this.rows.length;
     this.markSelection();
     const node = this.rows[this.selected];
     if (node && node.scrollIntoView) node.scrollIntoView({ block: "nearest" });
@@ -1956,17 +1977,24 @@ class CalendarPanel {
   }
 
   render() {
+    this.renderShell();
+    void this.refresh();
+  }
+
+  /* The shell is separate from the data so a host that rebuilds its own DOM can put
+     the same calendar back on screen without reading a month of files again. */
+  renderShell() {
     const root = this.root;
     root.empty();
     root.addClass("thinker-cal");
 
     const nav = root.createDiv({ cls: "thinker-cal-nav" });
     const prev = nav.createEl("button", { cls: "thinker-cal-btn", text: "‹" });
-    prev.setAttribute("aria-label", "previous month");
+    prev.setAttribute("aria-label", t("cal.prev"));
     prev.addEventListener("click", () => this.shift(-1));
     this.label = nav.createSpan({ cls: "thinker-cal-label" });
     const next = nav.createEl("button", { cls: "thinker-cal-btn", text: "›" });
-    next.setAttribute("aria-label", "next month");
+    next.setAttribute("aria-label", t("cal.next"));
     next.addEventListener("click", () => this.shift(1));
 
     const weekdays = root.createDiv({ cls: "thinker-cal-weekdays" });
@@ -1974,7 +2002,16 @@ class CalendarPanel {
       weekdays.createSpan({ cls: "thinker-cal-weekday", text: name });
     }
     this.grid = root.createDiv({ cls: "thinker-cal-grid" });
-    void this.refresh();
+    this.label.setText(t("cal.title", { year: this.year, month: this.month }));
+  }
+
+  /* Brings the grid to a given month, used when the page around it moves. */
+  setMonth(year, month) {
+    if (this.year === year && this.month === month) return;
+    this.year = year;
+    this.month = month;
+    if (this.label) this.label.setText(t("cal.title", { year: this.year, month: this.month }));
+    if (this.grid) void this.refresh();
   }
 
   shift(delta) {
@@ -2021,6 +2058,12 @@ class CalendarPanel {
       day.createSpan({ cls: "thinker-day-num", text: String(Number(key.slice(-2))) });
       day.createSpan({ cls: "thinker-day-dot" });
       day.addEventListener("click", () => {
+        /* A host that shows its own detail — the statistics panel, which turns the
+           page to that day — passes onPick and keeps the day modal out of the way. */
+        if (typeof this.deps.onPick === "function") {
+          this.deps.onPick(key);
+          return;
+        }
         new DayModal(this.deps, key, () => {
           void this.refresh();
           this.deps.onRecordsChanged();
@@ -2765,6 +2808,7 @@ class StatsView extends ItemView {
     this.mode = "week";
     this.anchor = todayKey();
     this.token = 0;
+    this.calendar = null;
   }
 
   getViewType() {
@@ -2867,6 +2911,35 @@ class StatsView extends ItemView {
     else this.renderMonthChart(root, period.keys, map);
 
     this.renderTags(root, records);
+    this.renderCalendar(root);
+  }
+
+  /* The same month grid as the start page, under the numbers. A day picked here is
+     what the page turns to, so the numbers above and the day below always agree. */
+  renderCalendar(root) {
+    root.createDiv({ cls: "thinker-stats-label", text: t("stats.calendar") });
+    const host = root.createDiv({ cls: "thinker-stats-cal" });
+    const date = parseDateKey(this.anchor);
+    if (!this.calendar) {
+      this.calendar = new CalendarPanel(host, {
+        storage: this.deps.storage,
+        getSettings: this.deps.getSettings,
+        onRecordsChanged: () => void this.render(),
+        onPick: (dayKey) => this.drill(dayKey)
+      });
+      this.calendar.year = date.getFullYear();
+      this.calendar.month = date.getMonth() + 1;
+      this.calendar.render();
+      return;
+    }
+    /* The page was rebuilt, so the calendar's host element is a new node. The shell
+       is drawn again on it and the month is read again, which keeps the grid in step
+       with the period the numbers above are describing. */
+    this.calendar.root = host;
+    this.calendar.year = date.getFullYear();
+    this.calendar.month = date.getMonth() + 1;
+    this.calendar.renderShell();
+    void this.calendar.refresh();
   }
 
   renderHead(root, period) {

@@ -35,7 +35,11 @@ timer, and a month of focus history.
    without that second line is 32px tall instead of 44, so the list is not a column
    of gaps with names in them; rows that keep two lines keep the taller box. The
    order of the list is set in `Settings → Thinker → Note order`: name A to Z,
-   name Z to A, newest first or oldest first.
+   name Z to A, newest first or oldest first. `Recent` is the one exception: it is
+   the last week's edits, so it always reads newest first whatever the setting says.
+   Nothing is tinted when the list is built: no outline and no fill, so the top of an
+   empty column stays empty. The tint appears the moment `↑ ↓` is used, and `Enter`
+   still opens the first row before any key has been pressed.
 3. **Arrange the row.** The pencil beside the `+` turns the range row into
    handles: drag a tab to the left half or the right half of another to move it
    in front of or behind. The order is written to the settings, so it survives a
@@ -60,7 +64,9 @@ timer, and a month of focus history.
    that day's sessions, and to open or create its diary note.
 8. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
    the statistics panel in the right sidebar. It switches between day, week and
-   month, and lists where the time went.
+   month, and lists where the time went. The month grid sits under the numbers:
+   click a day there and the panel turns to that day, so the two halves always
+   describe the same period.
 9. **Change the settings.** The gear in the left ribbon opens Obsidian's settings
    at this plugin's own tab, without going through the settings root.
 
@@ -163,6 +169,10 @@ English                 1
 
 排序在 设置 → 笔记排序 中选定，四档：名称 A → Z、名称 Z → A、时间 新 → 旧、时间 旧 → 新。文件夹顺序随名称方向，时间档对文件夹不适用，仍按名称升序。搜索时按匹配度排序，结果不受该设置影响。
 
+最近是唯一例外：它是最近七天的修改，因此恒按时间 新 → 旧，不受上面四档影响。否则它和全部只差一个过滤，看不出为什么单独分一档。
+
+打开面板时列表不显色：既没有描边，也没有底色，顶部那一条和其余各行一样干净。按下 `↑ ↓` 才出现选中底色，在此之前按 `Enter` 仍然打开第一项。
+
 设置 → 隐藏的文件夹 可排除指定目录，子目录一并排除，不进入索引。
 
 添加到收藏的笔记不再浮到列表顶部，避免打乱所选顺序。收藏仍是独立的分类。
@@ -225,6 +235,21 @@ English                 1
 - 日：24 小时时间轴，一段对应一次计时
 
 底部按标签汇总占比，最多五项，休息单列。
+
+再往下是一个可点击的月历，跟主页那块同一套：点一天，上面整页就切到那天。左右箭头翻月，与上面的周期互不牵制。
+
+图形与条形的颜色取自主题的强调色。旧版把这些颜色从一个固定层级的变量算出来，遇到把强调色定义在别处的主题就算不出颜色，柱形、热力、时间轴与构成条会整片变透明只剩数字。3.2.0 改为按主题实际定义的位置取值，并留了兜底色。
+
+笔记面板不用强调色，只用三级灰：分类行选中是字色加深加一道灰线，选中的笔记是灰描边，收藏是一道灰竖条，搜索框聚焦是灰边框。一列名字上再叠第二种颜色，要先学会它才能读，不值得。
+
+## 界面配色
+
+| 区域 | 颜色 |
+| --- | --- |
+| 笔记列表、分类行、搜索框 | 三级灰，无强调色 |
+| 计时器进度环 | 强调色 |
+| 主页日历 | 强调色（热力四档、今日格） |
+| 统计面板 | 强调色（柱形、热力、时间轴、构成条、底部月历） |
 
 ## 数据
 

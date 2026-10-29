@@ -9,7 +9,16 @@
    type 11/12/13/28/52. If a rule needs a number that is not on those scales, the
    rule is wrong. */
 
-:root {
+/* The tokens sit on both html and body on purpose. A custom property resolves its
+   own var() where it is declared, not where it is used, so a token declared only on
+   :root can never see --text-accent or --interactive-accent when the theme defines
+   them on body — the whole chain then resolves to nothing and every colour mixed
+   from it disappears. Declaring on body as well reads the theme's own values at the
+   level they actually live, and the literal at the end of the accent chain means a
+   theme that defines none of them still gets a visible bar instead of a blank one. */
+
+:root,
+body {
 	--tk-1: 4px;
 	--tk-2: 8px;
 	--tk-3: 12px;
@@ -21,9 +30,9 @@
 	--tk-r-md: 10px;
 	--tk-r-lg: 12px;
 
-	--tk-hair: var(--background-modifier-border);
-	--tk-accent: var(--text-accent, var(--color-accent, var(--interactive-accent)));
-	--tk-fill: var(--background-modifier-hover);
+	--tk-hair: var(--background-modifier-border, rgba(128, 128, 128, 0.24));
+	--tk-accent: var(--text-accent, var(--interactive-accent, var(--color-accent, #a55b2a)));
+	--tk-fill: var(--background-modifier-hover, rgba(128, 128, 128, 0.12));
 
 	--tk-fs-xs: 11px;
 	--tk-fs-sm: 12px;
@@ -190,8 +199,13 @@
 	transition: border-color var(--tk-dur) var(--tk-ease), background-color var(--tk-dur) var(--tk-ease);
 }
 
+/* The notes panel stays greyscale. Its only job is to say which note is which, and a
+   second colour on top of a column of names has to be learned before it can be read.
+   State is carried by weight and by grey: an open tab darkens and keeps a hairline
+   under it, a pressed button darkens, a selected row takes a grey edge. */
+
 .thinker-search:focus-within {
-	border-color: var(--tk-accent);
+	border-color: var(--text-muted);
 }
 
 .thinker-search-icon {
@@ -255,14 +269,14 @@
 }
 
 .thinker-chip:hover {
-	color: var(--tk-accent);
+	color: var(--text-normal);
 }
 
-/* The open range is the accent itself, not just the line under it: with folders on
-   the row, the line alone was too quiet to say which one is open. */
+/* The open range darkens to the reading colour and keeps a hairline under it: with
+   folders on the row, weight alone was too quiet to say which one is open. */
 .thinker-chip.is-on {
-	color: var(--tk-accent);
-	box-shadow: inset 0 -2px 0 var(--tk-accent);
+	color: var(--text-normal);
+	box-shadow: inset 0 -2px 0 var(--text-muted);
 }
 
 .thinker-chip-count {
@@ -420,9 +434,11 @@
 	background: var(--tk-fill);
 }
 
+/* The selected row is a tint, not a box. An outline around a row reads as a second
+   container inside the list, and the first row is selected whenever the panel opens,
+   so that box used to sit at the top of an otherwise empty column. */
 .thinker-note.is-selected {
 	background: var(--tk-fill);
-	box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--tk-accent) 40%, transparent);
 }
 
 .thinker-note.is-pinned::before {
@@ -434,7 +450,7 @@
 	width: 2px;
 	height: 16px;
 	border-radius: 1px;
-	background: var(--tk-accent);
+	background: var(--text-faint);
 }
 
 .thinker-note-main {
@@ -497,7 +513,7 @@
 }
 
 .thinker-new:hover {
-	color: var(--tk-accent);
+	color: var(--text-normal);
 }
 
 /* The pencil is the row's switch, so it carries an icon instead of a glyph. Both
@@ -515,7 +531,8 @@
 }
 
 .thinker-edit.is-on {
-	color: var(--tk-accent);
+	color: var(--text-normal);
+	box-shadow: inset 0 -2px 0 var(--text-muted);
 }
 
 .thinker-grid.is-swapped .thinker-foot-hint {
@@ -1328,6 +1345,20 @@
 	font-variant-numeric: tabular-nums;
 }
 
+/* ---------- the month grid under the numbers ----------
+   The start page sizes its grid by the pane it lives in; here the rows are a fixed
+   height, because this panel is read top to bottom and the numbers above do not
+   move when the grid below changes month. */
+
+.thinker-stats-cal {
+	padding-top: var(--tk-1);
+}
+
+.thinker-stats-cal .thinker-cal-grid {
+	height: auto;
+	grid-auto-rows: 26px;
+}
+
 /* ---------- narrow panes ----------
    A container query, not a window query: this page is often opened in a split,
    where the window is wide and the pane is not. */
@@ -1423,13 +1454,16 @@
 
 /* ---------- hover, in one place ----------
 
-   Every pressable label warms to the same accent at the same tempo, including the
-   title of a note row. Declared last so it settles ties with the per-component
-   rules above. */
+   Every pressable label warms to the same accent at the same tempo, except inside the
+   notes panel, which has no accent at all and only darkens to the reading colour.
+   Declared last so it settles ties with the per-component rules above. */
 
 .thinker-notes .thinker-chip:hover,
 .thinker-notes .thinker-new:hover,
-.thinker-notes .thinker-note:hover .thinker-note-title,
+.thinker-notes .thinker-note:hover .thinker-note-title {
+	color: var(--text-normal);
+}
+
 .thinker-timer .thinker-time:hover,
 .thinker-timer .thinker-mini:hover,
 .thinker-timer .thinker-phase.is-switch:hover,
@@ -1441,7 +1475,7 @@
 .thinker-modal .setting-item-control button:hover,
 .thinker-stats .thinker-unit-tab:hover,
 .thinker-stats .thinker-stats-range:hover {
-	color: var(--text-accent, var(--color-accent, #7f6df2));
+	color: var(--tk-accent);
 }
 
 .thinker-notes .thinker-note-title,
