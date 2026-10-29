@@ -61,7 +61,10 @@ timer, and a month of focus history.
    interruption longer than twelve hours is not counted, so a timer left running
    overnight is not filed as a night-long session.
 7. **Check the month.** Click a day in the calendar to see, add, edit or delete
-   that day's sessions, and to open or create its diary note.
+   that day's sessions, and to open or create its diary note. The calendar is grey
+   throughout: the four heat steps are four opacities of one grey, and today is only a
+   brighter digit — no ring, no fill — so the month reads as depth rather than as a
+   second colour beside the notes.
 8. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
    the statistics panel in the right sidebar. It switches between day, week and
    month, and lists where the time went.
@@ -211,6 +214,8 @@ English                 1
 
 左侧功能区三个入口：房屋图标打开主页，柱状图标在右栏打开统计，齿轮图标直接打开本插件的设置页。
 
+主页日历不用强调色：热力四档取同一灰色的四档透明度，今天只把数字提亮一档，没有边框。全页只剩计时环与统计面板还用强调色。
+
 ## 计时
 
 支持番茄钟与正计时。番茄钟完成后生成一条记录，达到设定轮数进入长休息。自动进入下一阶段可关闭。
@@ -244,7 +249,7 @@ English                 1
 | --- | --- |
 | 笔记列表、分类行、搜索框 | 三级灰，无强调色 |
 | 计时器进度环 | 强调色 |
-| 主页日历 | 强调色（热力四档、今日格） |
+| 主页日历 | 三级灰，热力四档用同一灰色的透明度递进，今天只提亮数字、无边框 |
 | 统计面板 | 强调色（柱形、热力、时间轴、构成条） |
 
 ## 数据

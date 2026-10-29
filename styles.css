@@ -767,34 +767,40 @@ body {
 	cursor: default;
 }
 
+/* Today is a brightness, not a box. A ring around one cell pulls the eye to the
+   corner of a grid that is meant to be read as a whole, and the calendar already
+   answers "how much" with its four greys; the day itself only has to be findable. */
 .thinker-day.is-today {
 	color: var(--text-normal);
-	box-shadow: inset 0 0 0 1px var(--tk-accent);
 }
 
 .thinker-day-dot {
 	display: none;
 }
 
-/* Heat is a gradient of one hue, and it is never the only signal: every cell
-   carries an aria-label with the session count, and clicking opens the detail. */
+/* Heat is a gradient of one grey, and it is never the only signal: every cell
+   carries an aria-label with the session count, and clicking opens the detail.
+   Four steps of the same grey, so a month reads as depth rather than as a second
+   colour sitting next to the notes. The statistics panel keeps its accent version
+   further down: there the bars and the heat are the only thing on screen, and a
+   page of grey bars says less than a page of coloured ones. */
 .thinker-heat-1 {
-	background: color-mix(in srgb, var(--tk-accent) 14%, transparent);
+	background: color-mix(in srgb, var(--text-faint) 13%, transparent);
 }
 
 .thinker-heat-2 {
-	background: color-mix(in srgb, var(--tk-accent) 26%, transparent);
+	background: color-mix(in srgb, var(--text-faint) 24%, transparent);
 	color: var(--text-normal);
 }
 
 .thinker-heat-3 {
-	background: color-mix(in srgb, var(--tk-accent) 40%, transparent);
+	background: color-mix(in srgb, var(--text-faint) 37%, transparent);
 	color: var(--text-normal);
 }
 
 .thinker-heat-4 {
-	background: color-mix(in srgb, var(--tk-accent) 56%, transparent);
-	color: var(--text-on-accent, #fff);
+	background: color-mix(in srgb, var(--text-faint) 52%, transparent);
+	color: var(--text-normal);
 }
 
 /* ---------- icon buttons ---------- */
@@ -1289,6 +1295,24 @@ body {
 	box-shadow: inset 0 0 0 1px var(--tk-accent);
 }
 
+/* The statistics panel reads in the accent: it is a page of charts with no words
+   around them, so the heat here is the colour version of the same four steps. */
+.thinker-mcell.thinker-heat-1 {
+	background: color-mix(in srgb, var(--tk-accent) 14%, transparent);
+}
+
+.thinker-mcell.thinker-heat-2 {
+	background: color-mix(in srgb, var(--tk-accent) 26%, transparent);
+}
+
+.thinker-mcell.thinker-heat-3 {
+	background: color-mix(in srgb, var(--tk-accent) 40%, transparent);
+}
+
+.thinker-mcell.thinker-heat-4 {
+	background: color-mix(in srgb, var(--tk-accent) 56%, transparent);
+}
+
 /* ---------- what the time was spent on ---------- */
 
 .thinker-tags {
@@ -1441,26 +1465,28 @@ body {
 /* ---------- hover, in one place ----------
 
    Every pressable label warms to the same accent at the same tempo, except inside the
-   notes panel, which has no accent at all and only darkens to the reading colour.
-   Declared last so it settles ties with the per-component rules above. */
+   notes panel and on the start page's calendar, which carry no accent at all and only
+   darken to the reading colour. Declared last so it settles ties with the per-component
+   rules above. */
 
 .thinker-notes .thinker-chip:hover,
 .thinker-notes .thinker-new:hover,
-.thinker-notes .thinker-note:hover .thinker-note-title {
+.thinker-notes .thinker-note:hover .thinker-note-title,
+.thinker-cal .thinker-cal-btn:hover {
 	color: var(--text-normal);
 }
 
 .thinker-timer .thinker-time:hover,
 .thinker-timer .thinker-mini:hover,
 .thinker-timer .thinker-phase.is-switch:hover,
-.thinker-cal .thinker-cal-btn:hover,
 .thinker-modal .thinker-day-btn:hover,
 .thinker-modal .thinker-create-kind:hover,
 .thinker-modal .thinker-day-add:hover,
 .thinker-modal .thinker-day-diary:hover,
 .thinker-modal .setting-item-control button:hover,
 .thinker-stats .thinker-unit-tab:hover,
-.thinker-stats .thinker-stats-range:hover {
+.thinker-stats .thinker-stats-range:hover,
+.thinker-stats .thinker-cal-btn:hover {
 	color: var(--tk-accent);
 }
 

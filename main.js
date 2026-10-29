@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.2.4 · no stats calendar";
+const BUILD = "3.3.0 · no rings";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
