@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.3.0 · no rings";
+const BUILD = "3.3.1 · range switches";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -162,6 +162,12 @@ const EN = {
   "settings.sortNameDesc": "Name, Z to A",
   "settings.sortNewest": "Newest first",
   "settings.sortOldest": "Oldest first",
+  "settings.showAll": "Show All",
+  "settings.showAllDesc": "The whole vault as one flat list",
+  "settings.showRecent": "Show Recent",
+  "settings.showRecentDesc": "Everything edited in the last week, newest first",
+  "settings.showPinned": "Show Pinned",
+  "settings.showPinnedDesc": "The notes listed under Pinned below",
   "settings.pins": "Pinned notes",
   "settings.pinsNone": "Empty",
   "settings.hiddenFolders": "Hidden folders",
@@ -337,6 +343,12 @@ const ZH = {
   "settings.sortNameDesc": "名称 Z → A",
   "settings.sortNewest": "时间 新 → 旧",
   "settings.sortOldest": "时间 旧 → 新",
+  "settings.showAll": "显示 全部",
+  "settings.showAllDesc": "整个库作为一张平铺列表",
+  "settings.showRecent": "显示 最近",
+  "settings.showRecentDesc": "最近七天改过的笔记，最新的在前",
+  "settings.showPinned": "显示 收藏",
+  "settings.showPinnedDesc": "下面「收藏的笔记」里列出的那几篇",
   "settings.pins": "收藏的笔记",
   "settings.pinsNone": "空",
   "settings.hiddenFolders": "隐藏的文件夹",
@@ -1436,13 +1448,20 @@ class NotePanel {
       { key: "recent", label: t("notes.recent"), count: null },
       { key: "pinned", label: t("notes.pinned"), count: pinned || null }
     );
-    if (this.category !== "all" && this.category !== "recent" && this.category !== "pinned") {
-      const known = items.some((item) => item.key === this.category);
-      if (!known) {
-        this.category = "all";
-      }
+    /* A range the settings turned off is not built at all, so the row shrinks the way
+       the user asked. Folders are never in this list — they have no switch. */
+    const shown = items.filter((item) => {
+      if (item.key === "all") return settings.showAll !== false;
+      if (item.key === "recent") return settings.showRecent !== false;
+      if (item.key === "pinned") return settings.showPinned !== false;
+      return true;
+    });
+    /* Whatever was open may have just been switched off, or a folder it pointed at
+       may have been renamed: land on the first thing still in the row. */
+    if (!shown.some((item) => item.key === this.category)) {
+      this.category = shown.length > 0 ? this.orderKeys(shown)[0].key : "all";
     }
-    const ordered = this.orderKeys(items);
+    const ordered = this.orderKeys(shown);
     for (const item of ordered) {
       const chip = chips.createSpan({
         cls: item.key === this.category ? "thinker-chip is-on" : "thinker-chip",
@@ -1565,8 +1584,25 @@ class NotePanel {
       if (key) keys.push(key);
     }
     if (keys.length === 0) return;
-    const value = keys.join("\n");
     const settings = this.deps.getSettings();
+    /* A range switched off is not in the row, but its place in the order is still
+       worth keeping: written straight from the row it would be dropped here, and
+       turning the range back on would then land it at the end instead of where the
+       user had put it. Hidden keys hold their slot; visible ones fill the rest in the
+       order the drag left them. */
+    const previous = parseLines(settings.chipOrder);
+    const live = new Set(keys);
+    const merged = [];
+    let at = 0;
+    for (const key of previous) {
+      if (live.has(key)) {
+        if (at < keys.length) merged.push(keys[at++]);
+      } else {
+        merged.push(key);
+      }
+    }
+    while (at < keys.length) merged.push(keys[at++]);
+    const value = merged.join("\n");
     if (settings.chipOrder === value) return;
     settings.chipOrder = value;
     if (this.deps.saveSettings) void this.deps.saveSettings();
@@ -3068,6 +3104,12 @@ const DEFAULT_SETTINGS = {
   searchScope: "title",
   listLimit: 40,
   noteSort: "name-asc",
+  /* The three vault-wide ranges are optional. Folders are not: they are the places
+     notes actually live, and a notes panel with no folder in it has nothing to say
+     about where anything is. */
+  showAll: true,
+  showRecent: true,
+  showPinned: true,
   chipOrder: "",
   pinnedNotes: "",
   hiddenFolders: "",
@@ -3107,6 +3149,9 @@ function readSettings(raw) {
     searchScope: source.searchScope === "full" ? "full" : "title",
     listLimit: num("listLimit", 5, 400),
     noteSort: NOTE_ORDERS.indexOf(source.noteSort) >= 0 ? source.noteSort : "name-asc",
+    showAll: flag("showAll"),
+    showRecent: flag("showRecent"),
+    showPinned: flag("showPinned"),
     chipOrder: text("chipOrder"),
     pinnedNotes: text("pinnedNotes"),
     hiddenFolders: text("hiddenFolders"),
@@ -3231,6 +3276,24 @@ class ThinkerSettingTab extends PluginSettingTab {
         this.plugin.refreshNoteViews();
       });
     });
+
+    const rangeToggles = [
+      ["settings.showAll", "settings.showAllDesc", "showAll"],
+      ["settings.showRecent", "settings.showRecentDesc", "showRecent"],
+      ["settings.showPinned", "settings.showPinnedDesc", "showPinned"]
+    ];
+    for (const [nameKey, descKey, field] of rangeToggles) {
+      new Setting(containerEl)
+        .setName(t(nameKey))
+        .setDesc(t(descKey))
+        .addToggle((toggle) =>
+          toggle.setValue(settings[field] !== false).onChange((value) => {
+            settings[field] = value;
+            commit();
+            this.plugin.refreshNoteViews();
+          })
+        );
+    }
 
     new Setting(containerEl)
       .setName(t("settings.hiddenFolders"))

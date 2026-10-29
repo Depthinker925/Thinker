@@ -25,7 +25,8 @@ timer, and a month of focus history.
    rather than sitting beside it, so nothing flashes up first. You can also click
    the house icon in the left ribbon, or run `Thinker: Open home page`.
 2. **Read the list.** The page opens on the first folder in the row. The range row
-   lists your own folders first, then `All`, `Recent` and `Pinned`. Folders are
+   lists your own folders first, then `All`, `Recent` and `Pinned`. Each of those
+   three can be switched off in the settings; folders cannot. Folders are
    headings and notes sit under them; choosing a folder shows its own notes and
    folds the subfolders into headings. A note row is the note's name and when it
    changed. Under `All` and `Recent` the row also carries the folder it lives in,
@@ -166,7 +167,7 @@ English                 1
 
 笔记行只显示名称与修改时间。全部与最近两档没有文件夹行，名称下面补一行所在路径，否则不知道笔记在哪个目录；其它分类的路径已由上方文件夹行表达，不再重复，根目录的笔记在全部里显示为「根目录」。全文搜索命中时，这一行改为正文片段。没有路径的分类行高从 44 收到 32，免得名字下面空出一块；带路径的行与带片段的两行行高不变。
 
-顶部分类行先列库内文件夹，再列全部 / 最近 / 收藏。打开页面时默认选中第一个文件夹，按当前排序的第一项；库里没有文件夹时落在全部。输入搜索内容时列表转为平铺结果，清空后恢复。
+顶部分类行先列库内文件夹，再列全部 / 最近 / 收藏。后三项可以在设置里逐个关掉，文件夹没有开关。打开页面时默认选中第一个文件夹，按当前排序的第一项；库里没有文件夹时落在全部。输入搜索内容时列表转为平铺结果，清空后恢复。
 
 排序在 设置 → 笔记排序 中选定，四档：名称 A → Z、名称 Z → A、时间 新 → 旧、时间 旧 → 新。文件夹顺序随名称方向，时间档对文件夹不适用，仍按名称升序。搜索时按匹配度排序，结果不受该设置影响。
 
