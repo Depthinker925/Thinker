@@ -272,6 +272,38 @@
 	font-variant-numeric: tabular-nums;
 }
 
+/* ---------- arranging the row ----------
+
+   The pencil beside the plus turns the tabs into handles. The outline is drawn
+   inside a padding that cancels its own margin, so switching the mode on moves
+   nothing: only the size and the cursor change. */
+
+.thinker-chips.is-reordering .thinker-chip {
+	margin-inline: calc(-1 * var(--tk-1));
+	padding-inline: var(--tk-1);
+	border-radius: 3px;
+	cursor: grab;
+	user-select: none;
+	box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
+
+/* Inside the mode the accent underline would read as the drop target, so the
+   open tab keeps the plain text colour and lets the outline do the talking. */
+.thinker-chips.is-reordering .thinker-chip.is-on {
+	color: var(--text-normal);
+	box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
+
+.thinker-chips.is-reordering .thinker-chip:hover {
+	color: var(--text-normal);
+	background: var(--tk-fill);
+}
+
+.thinker-chip.is-dragging {
+	opacity: 0.35;
+	cursor: grabbing;
+}
+
 .thinker-list {
 	flex: 1 1 auto;
 	min-height: 0;
@@ -371,6 +403,19 @@
 	transition: background-color var(--tk-dur) var(--tk-ease);
 }
 
+/* A one-line row: 44px was the height of a name plus the path under it, so a row
+   that no longer has a path keeps the name and gives the rest back. The list is
+   compact everywhere the path is gone, in 全部 / 最近 it stays tall, and a row
+   that still carries a search snippet keeps the taller box instead of squeezing
+   two lines into one. */
+.thinker-list.is-compact .thinker-note {
+	height: 32px;
+}
+
+.thinker-list.is-compact .thinker-note.is-two-line {
+	height: 44px;
+}
+
 .thinker-note:hover {
 	background: var(--tk-fill);
 }
@@ -452,6 +497,24 @@
 }
 
 .thinker-new:hover {
+	color: var(--tk-accent);
+}
+
+/* The pencil is the row's switch, so it carries an icon instead of a glyph. Both
+   buttons share one line box so the icon's baseline sits where the plus does. */
+.thinker-edit {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 1em;
+}
+
+.thinker-edit svg {
+	width: 11px;
+	height: 11px;
+}
+
+.thinker-edit.is-on {
 	color: var(--tk-accent);
 }
 

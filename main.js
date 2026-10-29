@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "2.108.1028 · index sheet";
+const BUILD = "3.0.0 · tab order";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -76,6 +76,9 @@ const EN = {
   "notes.deleted": "Moved to trash",
   "notes.untitled": "Untitled",
   "notes.scanning": "Indexing notes…",
+  "notes.reorder": "Reorder tabs",
+  "notes.reorderOn": "Drag a tab to move it",
+  "notes.reorderDone": "Tab order saved",
 
   "timer.focus": "Focus",
   "timer.shortBreak": "Short break",
@@ -245,6 +248,9 @@ const ZH = {
   "notes.deleted": "已移入回收站",
   "notes.untitled": "未命名",
   "notes.scanning": "正在索引笔记…",
+  "notes.reorder": "调整标签顺序",
+  "notes.reorderOn": "拖动标签即可调整顺序",
+  "notes.reorderDone": "标签顺序已保存",
 
   "timer.focus": "专注",
   "timer.shortBreak": "短休息",
@@ -1291,6 +1297,28 @@ class NotePanel {
     this.rows = [];
     this.selected = 0;
     this.pendingQuery = "";
+    this.reordering = false;
+    this.dragging = null;
+  }
+
+  /* The order of the range row is the user's, not the vault's. The pencil writes
+     it into the settings and every later render reads it back through here. A
+     key that is not in the stored order (a folder made after the last drag) keeps
+     its default place at the end instead of jumping to the front. */
+  orderKeys(items) {
+    const order = parseLines(this.deps.getSettings().chipOrder || "");
+    if (order.length === 0) return items;
+    const rank = new Map();
+    order.forEach((key, index) => rank.set(key, index));
+    return items
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => {
+        const ra = rank.has(a.item.key) ? rank.get(a.item.key) : Number.MAX_SAFE_INTEGER;
+        const rb = rank.has(b.item.key) ? rank.get(b.item.key) : Number.MAX_SAFE_INTEGER;
+        if (ra !== rb) return ra - rb;
+        return a.index - b.index;
+      })
+      .map((slot) => slot.item);
   }
 
   /* The first folder in the row, in the order the settings ask for. 全部 stays one
@@ -1300,7 +1328,11 @@ class NotePanel {
     if (folders.length === 0) return "all";
     const descending = this.deps.getSettings().noteSort === "name-desc";
     const ordered = descending ? folders.slice().reverse() : folders;
-    return ordered[0].path;
+    /* What sits first in the row is what the panel opens on, so a hand-made
+       order decides the landing folder as well. */
+    const byKey = new Map(ordered.map((folder) => [folder.path, folder]));
+    const first = this.orderKeys(ordered.map((folder) => ({ key: folder.path, folder })))[0];
+    return first && byKey.has(first.key) ? first.key : ordered[0].path;
   }
 
   render() {
@@ -1310,6 +1342,8 @@ class NotePanel {
 
     const nav = root.createDiv({ cls: "thinker-nav" });
     this.chips = nav.createDiv({ cls: "thinker-chips" });
+    this.chips.addEventListener("dragover", (evt) => this.onChipDragOver(evt));
+    this.chips.addEventListener("drop", (evt) => evt.preventDefault());
     this.list = root.createDiv({ cls: "thinker-list" });
 
     /* The field sits under the list. Reading the list is the main act here;
@@ -1339,12 +1373,15 @@ class NotePanel {
     this.refreshRows();
     const total = this.deps.index.entries.length;
     this.input.placeholder = t("notes.placeholder", { count: total.toLocaleString(lang === "zh" ? "zh-CN" : "en-US") });
-    this.footHint.setText(t("notes.hint"));
+    this.footHint.setText(this.reordering ? t("notes.reorderOn") : t("notes.hint"));
   }
 
   renderChips() {
     const chips = this.chips;
     chips.empty();
+    /* A rebuild replaces the node the drag was moving; forgetting it keeps the
+       next dragstart from pointing at something that is no longer in the page. */
+    this.dragging = null;
     const total = this.deps.index.entries.length;
     const pinned = this.deps.index.pinnedPaths().length;
     /* The user's own folders come first: they are the places notes actually live.
@@ -1369,26 +1406,134 @@ class NotePanel {
         this.category = "all";
       }
     }
-    for (const item of items) {
+    const ordered = this.orderKeys(items);
+    for (const item of ordered) {
       const chip = chips.createSpan({
         cls: item.key === this.category ? "thinker-chip is-on" : "thinker-chip",
         text: item.label
       });
+      chip.dataset.key = item.key;
+      chip.draggable = this.reordering;
+      if (this.reordering) chip.addClass("is-movable");
       if (item.count != null) chip.createSpan({ cls: "thinker-chip-count", text: String(item.count) });
       chip.addEventListener("click", () => {
+        /* While the row is being arranged a click is a miss, not a filter. */
+        if (this.reordering) return;
         this.category = item.key;
         this.selected = 0;
         this.renderChips();
         this.refreshRows();
       });
+      chip.addEventListener("dragstart", (evt) => {
+        if (!this.reordering) {
+          evt.preventDefault();
+          return;
+        }
+        this.dragging = chip;
+        chip.addClass("is-dragging");
+        if (evt.dataTransfer) {
+          evt.dataTransfer.effectAllowed = "move";
+          try {
+            evt.dataTransfer.setData("text/plain", item.key);
+          } catch (e) {
+            /* a browser without a data transfer is still draggable in place */
+          }
+        }
+      });
+      chip.addEventListener("dragend", () => {
+        if (this.dragging) this.dragging.removeClass("is-dragging");
+        this.dragging = null;
+        this.persistChipOrder();
+      });
     }
 
     /* The plus follows the last range instead of floating at the far right: with
-       folders it ends up after the folders, without folders after 收藏. */
+       folders it ends up after the folders, without folders after 收藏. The pencil
+       sits right beside it and turns the same row into something you can push
+       around; the order it leaves behind is kept in the settings. */
     this.newBtn = chips.createEl("button", { cls: "thinker-new", text: "+" });
     this.newBtn.setAttribute("aria-label", t("create.title"));
     this.newBtn.setAttribute("title", t("create.title"));
     this.newBtn.addEventListener("click", () => this.openCreate());
+
+    this.editBtn = chips.createEl("button", { cls: "thinker-new thinker-edit" });
+    setIcon(this.editBtn, "pencil");
+    this.editBtn.setAttribute("aria-label", t("notes.reorder"));
+    this.editBtn.setAttribute("title", t("notes.reorder"));
+    this.editBtn.toggleClass("is-on", this.reordering);
+    this.editBtn.addEventListener("click", () => this.toggleReorder());
+
+    chips.toggleClass("is-reordering", this.reordering);
+  }
+
+  /* Editing the row is a mode, not a gesture hidden behind a modifier: the pencil
+     turns it on, the row says so, and the next click on the pencil puts it back.
+     Nothing is written until a drag ends, so turning the mode on and off again
+     leaves the settings untouched. */
+  toggleReorder(force) {
+    this.reordering = typeof force === "boolean" ? force : !this.reordering;
+    if (this.dragging) {
+      this.dragging.removeClass("is-dragging");
+      this.dragging = null;
+    }
+    if (this.chips) {
+      this.chips.toggleClass("is-reordering", this.reordering);
+      for (const node of this.chips.querySelectorAll(".thinker-chip")) {
+        node.draggable = this.reordering;
+        node.toggleClass("is-movable", this.reordering);
+      }
+    }
+    if (this.editBtn) this.editBtn.toggleClass("is-on", this.reordering);
+    if (this.footHint) this.footHint.setText(this.reordering ? t("notes.reorderOn") : t("notes.hint"));
+    if (!this.reordering) this.persistChipOrder();
+  }
+
+  /* The nearest chip to the pointer wins the comparison, distance inside a row
+     counted before distance between rows: with a wrapped row the drop target has
+     to be the one under the cursor, not the one further along the current line. */
+  chipAt(x, y) {
+    if (!this.chips) return null;
+    let best = null;
+    let bestDist = Infinity;
+    for (const node of this.chips.querySelectorAll(".thinker-chip")) {
+      const rect = node.getBoundingClientRect();
+      if (!rect.width && !rect.height) continue;
+      const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
+      const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
+      const dist = dx + dy * 3;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = node;
+      }
+    }
+    return best;
+  }
+
+  onChipDragOver(evt) {
+    if (!this.reordering || !this.dragging) return;
+    const target = this.chipAt(evt.clientX, evt.clientY);
+    if (!target || target === this.dragging) return;
+    evt.preventDefault();
+    if (evt.dataTransfer) evt.dataTransfer.dropEffect = "move";
+    const rect = target.getBoundingClientRect();
+    const before = evt.clientX < rect.left + rect.width / 2;
+    if ((before ? target.previousSibling : target.nextSibling) === this.dragging) return;
+    this.chips.insertBefore(this.dragging, before ? target : target.nextSibling);
+  }
+
+  persistChipOrder() {
+    if (!this.chips) return;
+    const keys = [];
+    for (const node of this.chips.querySelectorAll(".thinker-chip")) {
+      const key = node.dataset ? node.dataset.key : node.getAttribute("data-key");
+      if (key) keys.push(key);
+    }
+    if (keys.length === 0) return;
+    const value = keys.join("\n");
+    const settings = this.deps.getSettings();
+    if (settings.chipOrder === value) return;
+    settings.chipOrder = value;
+    if (this.deps.saveSettings) void this.deps.saveSettings();
   }
 
   /* Only shown for a real folder, and only when there is something to choose
@@ -1447,14 +1592,29 @@ class NotePanel {
     /* In 全部 the list is just the files: no folder headings, no size ladder. The
        ladder belongs to a category, where it is the only thing carrying structure. */
     const showFolders = !virtual;
+    /* 收藏 is flat like the other two, but it is a hand-picked shortlist: the note
+       is there because it was chosen, not because it turned up in a sweep. */
+    const showPath = this.category === "all" || this.category === "recent";
+    /* A row that lost its second line has to lose the height that line was
+       holding, or the list reads as gaps with names in them. The two ranges that
+       keep the path, and any row that still carries a search snippet, keep the
+       taller row. */
+    list.toggleClass("is-compact", !showPath);
 
     const addRow = (entry) => {
       const row = list.createDiv({ cls: "thinker-note" });
       if (pinnedSet.has(entry.path)) row.addClass("is-pinned");
       const main = row.createDiv({ cls: "thinker-note-main" });
       main.createDiv({ cls: "thinker-note-title", text: entry.title || t("notes.untitled") });
-      const meta = entry.snippet ? entry.snippet : entry.parent || t("notes.root");
-      main.createDiv({ cls: "thinker-note-meta", text: meta });
+      /* 全部 and 最近 are the two ranges whose rows have no folder heading above
+         them, so there the row carries its own address. In a folder the heading
+         already says where the note lives and a second line is noise. A full-text
+         hit keeps its snippet: that is the note's own words, not its address. */
+      const meta = entry.snippet ? entry.snippet : showPath ? entry.parent || t("notes.root") : "";
+      if (meta) {
+        main.createDiv({ cls: "thinker-note-meta", text: meta });
+        row.addClass("is-two-line");
+      }
       row.createSpan({ cls: "thinker-note-when", text: relativeTime(entry.mtime) });
       const index = this.rows.length;
       this.rows.push(row);
@@ -1903,7 +2063,8 @@ class HomeView extends ItemView {
     this.notes = new NotePanel(notesBox, {
       app: this.app,
       index: this.deps.index,
-      getSettings: this.deps.getSettings
+      getSettings: this.deps.getSettings,
+      saveSettings: this.deps.saveSettings
     });
     this.notes.render();
 
@@ -2853,6 +3014,7 @@ const DEFAULT_SETTINGS = {
   searchScope: "title",
   listLimit: 40,
   noteSort: "name-asc",
+  chipOrder: "",
   pinnedNotes: "",
   hiddenFolders: "",
   focusMinutes: 25,
@@ -2891,6 +3053,7 @@ function readSettings(raw) {
     searchScope: source.searchScope === "full" ? "full" : "title",
     listLimit: num("listLimit", 5, 400),
     noteSort: NOTE_ORDERS.indexOf(source.noteSort) >= 0 ? source.noteSort : "name-asc",
+    chipOrder: text("chipOrder"),
     pinnedNotes: text("pinnedNotes"),
     hiddenFolders: text("hiddenFolders"),
     focusMinutes: num("focusMinutes", 1, 180),

@@ -3,6 +3,8 @@
 A start page for an Obsidian vault: a clock, the notes as an outline, a focus
 timer, and a month of focus history.
 
+<img src="assets/thinker.png" alt="The Thinker start page: the clock, the notes as an outline, the focus timer and the month calendar" width="880">
+
 ## Installation
 
 **From the community list**
@@ -25,25 +27,37 @@ timer, and a month of focus history.
 2. **Read the list.** The page opens on the first folder in the row. The range row
    lists your own folders first, then `All`, `Recent` and `Pinned`. Folders are
    headings and notes sit under them; choosing a folder shows its own notes and
-   folds the subfolders into headings. The order of the list is set in
-   `Settings → Thinker → Note order`: name A to Z, name Z to A, newest first or
-   oldest first.
-3. **Create something.** The `+` at the end of the range row opens one dialog for
+   folds the subfolders into headings. A note row is the note's name and when it
+   changed. Under `All` and `Recent` the row also carries the folder it lives in,
+   because those two ranges have no folder headings above them; inside a folder
+   the heading already says that, and `Pinned` is a shortlist you made yourself.
+   A full-text hit replaces that line with a snippet of the note's own words. A row
+   without that second line is 32px tall instead of 44, so the list is not a column
+   of gaps with names in them; rows that keep two lines keep the taller box. The
+   order of the list is set in `Settings → Thinker → Note order`: name A to Z,
+   name Z to A, newest first or oldest first.
+3. **Arrange the row.** The pencil beside the `+` turns the range row into
+   handles: drag a tab to the left half or the right half of another to move it
+   in front of or behind. The order is written to the settings, so it survives a
+   restart, and a folder seen for the first time lands after the tabs already
+   arranged. Clicking a tab while the mode is on is treated as a miss, not as a
+   filter.
+4. **Create something.** The `+` at the end of the range row opens one dialog for
    both kinds: pick `Note` or `Folder`, type a name, then pick a place from the
    vault's outline, where every folder is listed and that level is shown by text
    size. The chosen folder's path is created if it does not exist yet.
-4. **Search.** The field sits under the list. Type to filter by title, alias and
+5. **Search.** The field sits under the list. Type to filter by title, alias and
    heading; `↑ ↓` to select, `Enter` to open, `Ctrl/Cmd + Enter` to create a note
    from what you typed, `Esc` to clear.
-5. **Run a session.** Click the digits inside the ring to start, click again to
+6. **Run a session.** Click the digits inside the ring to start, click again to
    end. `Pause` and `End` appear while a session runs. Every session is written to
    `FocusLog/<year>/<date>.md`.
-6. **Check the month.** Click a day in the calendar to see, add, edit or delete
+7. **Check the month.** Click a day in the calendar to see, add, edit or delete
    that day's sessions, and to open or create its diary note.
-7. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
+8. **Look at the numbers.** Click the bar-chart icon in the left ribbon to open
    the statistics panel in the right sidebar. It switches between day, week and
    month, and lists where the time went.
-8. **Change the settings.** The gear in the left ribbon opens Obsidian's settings
+9. **Change the settings.** The gear in the left ribbon opens Obsidian's settings
    at this plugin's own tab, without going through the settings root.
 
 ## Requirements and permissions
@@ -67,6 +81,17 @@ either one are readable by the other.
   pass takes a while; title search works throughout.
 - Folders only. Tags are not used for grouping.
 
+## Support
+
+Optional, and only that. Thinker is free, every feature is free, and nothing here
+is locked behind a payment. The two codes are WeChat and Alipay, for anyone who
+wants to send something back.
+
+<p>
+  <img src="assets/wechat.jpg" alt="WeChat" height="220">
+  <img src="assets/alipay.jpg" alt="Alipay" height="220">
+</p>
+
 Licensed under the MIT License.
 
 ---
@@ -75,6 +100,8 @@ Licensed under the MIT License.
 
 Obsidian 起始页插件。单页包含时钟、笔记、计时与日历四个区域。
 计时与记录格式沿用 Thinkers，历史数据直接可用。
+
+<img src="assets/thinker.png" alt="Thinker 起始页：时钟、笔记大纲、专注计时与月历" width="880">
 
 ## 安装
 
@@ -126,6 +153,8 @@ English                 1
 
 一级文件夹 15px，二级 13px，三级及以下 12px。点击文件夹可折叠该分支，折叠后仅保留文件夹行。
 
+笔记行只显示名称与修改时间。全部与最近两档没有文件夹行，名称下面补一行所在路径，否则不知道笔记在哪个目录；其它分类的路径已由上方文件夹行表达，不再重复，根目录的笔记在全部里显示为「根目录」。全文搜索命中时，这一行改为正文片段。没有路径的分类行高从 44 收到 32，免得名字下面空出一块；带路径的行与带片段的两行行高不变。
+
 顶部分类行先列库内文件夹，再列全部 / 最近 / 收藏。打开页面时默认选中第一个文件夹，按当前排序的第一项；库里没有文件夹时落在全部。输入搜索内容时列表转为平铺结果，清空后恢复。
 
 排序在 设置 → 笔记排序 中选定，四档：名称 A → Z、名称 Z → A、时间 新 → 旧、时间 旧 → 新。文件夹顺序随名称方向，时间档对文件夹不适用，仍按名称升序。搜索时按匹配度排序，结果不受该设置影响。
@@ -136,6 +165,8 @@ English                 1
 
 新建时点分类行末尾的 `+`，弹窗里有三件事：类型（笔记或文件夹）、名称、位置。位置按库内目录列出，空文件夹也会出现，层级高的字号大、层级低的字号小，不缩进。目标目录不存在时会逐级建好再放进去。
 
+`+` 右边的笔形按钮把分类行切到排序模式：标签变成可拖动的把手，按住拖到别的标签左半边之前、右半边之后，松手即生效。再次点笔退出。顺序存进设置，重开页面不变；新出现的文件夹排在已排过的标签之后。排序模式下点标签只当作没点中，不会切换分类。
+
 ## 键盘
 
 | 位置 | 按键 | 行为 |
@@ -145,6 +176,7 @@ English                 1
 | 搜索框 | Enter | 打开选中笔记 |
 | 搜索框 | Ctrl / Cmd + Enter | 以当前输入创建笔记，不弹窗 |
 | 分类行 + | 点击 | 弹窗选择新建笔记或文件夹，并指定位置 |
+| 分类行 笔 | 点击 | 进入或退出标签排序模式 |
 | 弹窗 | Enter | 创建 |
 | 弹窗 | 点击位置行 | 更换新建位置 |
 | 搜索框 | Esc | 清空 |
@@ -217,3 +249,13 @@ rest-count: 0
 - 全文搜索在后台分块读取文件。库较大时首次建立缓存需要等待，期间标题搜索正常可用。
 - 记录按日整文件重写。多台设备同时修改同一天时，以最后写入为准。
 - 分类依据文件夹，不读取标签。库根目录下的笔记归入「根目录」。
+
+## 支持
+
+可选，仅此而已。插件免费，全部功能免费，没有任何一项放在付款后面。两个码分别是微信与支付宝，愿意回一点心意就扫，不必勉强。
+
+<p>
+  <img src="assets/wechat.jpg" alt="微信" height="220">
+  <img src="assets/alipay.jpg" alt="支付宝" height="220">
+</p>
+
