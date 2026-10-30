@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.3.2 · note tab reuse";
+const BUILD = "3.4.0 · status line, day ring, week strip";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -64,7 +64,6 @@ const EN = {
   "create.where": "Place",
   "create.make": "Create",
   "create.exists": "That name is taken",
-  "notes.hint": "Up/Down to pick, Enter to open",
   "notes.empty": "No note matches",
   "notes.createNamed": "Create \"{name}\"",
   "notes.saveTo": "Saved to {folder}",
@@ -77,7 +76,6 @@ const EN = {
   "notes.untitled": "Untitled",
   "notes.scanning": "Indexing notes…",
   "notes.reorder": "Reorder tabs",
-  "notes.reorderOn": "Drag a tab to move it",
   "notes.reorderDone": "Tab order saved",
 
   "timer.focus": "Focus",
@@ -85,12 +83,10 @@ const EN = {
   "timer.longBreak": "Long break",
   "timer.pomodoro": "Pomodoro",
   "timer.stopwatch": "Stopwatch",
-  "timer.round": "Round {n}",
   "timer.pause": "Pause",
   "timer.resume": "Resume",
   "timer.stop": "End",
-  "timer.idleHint": "Press the digits to start, again to end",
-  "timer.today": "{duration} today",
+  "timer.start": "Start",
 
   "cal.title": "{year}-{month}",
   "cal.prev": "Previous month",
@@ -245,7 +241,6 @@ const ZH = {
   "create.where": "位置",
   "create.make": "创建",
   "create.exists": "已有同名项",
-  "notes.hint": "↑↓ 选择 · Enter 打开",
   "notes.empty": "没有匹配的笔记",
   "notes.createNamed": "新建「{name}」",
   "notes.saveTo": "保存到 {folder}",
@@ -258,7 +253,6 @@ const ZH = {
   "notes.untitled": "未命名",
   "notes.scanning": "正在索引笔记…",
   "notes.reorder": "调整标签顺序",
-  "notes.reorderOn": "拖动标签即可调整顺序",
   "notes.reorderDone": "标签顺序已保存",
 
   "timer.focus": "专注",
@@ -266,12 +260,10 @@ const ZH = {
   "timer.longBreak": "长休息",
   "timer.pomodoro": "番茄钟",
   "timer.stopwatch": "正计时",
-  "timer.round": "第 {n} 轮",
   "timer.pause": "暂停",
   "timer.resume": "继续",
   "timer.stop": "结束",
-  "timer.idleHint": "点数字开始 · 再点结束",
-  "timer.today": "今日 {duration}",
+  "timer.start": "开始",
 
   "cal.title": "{year} 年 {month} 月",
   "cal.prev": "上个月",
@@ -476,6 +468,24 @@ function formatClock(sec) {
   const s = total % 60;
   if (h > 0) return `${h}:${pad2(m)}:${pad2(s)}`;
   return `${pad2(m)}:${pad2(s)}`;
+}
+
+/* The day's focus, including the session that is running right now.
+
+   A record only exists once a session ends, so a ring fed from the log alone
+   would sit still for two hours and then jump. The number on the page is the day,
+   so it has to move while the day is being spent. A break is not focus and is
+   never added. */
+function dayFocusSec(todaySec, engine) {
+  const base = Math.max(0, Number(todaySec) || 0);
+  if (!engine || engine.state === "idle" || engine.phase !== "focus") return base;
+  return base + Math.max(0, engine.elapsedSec());
+}
+
+/* A day against its goal, capped: over the goal is still a full ring, not a
+   second lap and not an error colour. */
+function dayRatio(daySec, goalSec) {
+  return Math.max(0, Math.min(1, daySec / Math.max(1, goalSec)));
 }
 
 function clockOf(ts) {
@@ -1342,6 +1352,9 @@ class NotePanel {
     this.query = "";
     this.results = [];
     this.rows = [];
+    /* The list is grouped by folder, so the row order is not the result order.
+       A row carries its own entry instead of an index into `results`. */
+    this.rowEntries = [];
     this.selected = 0;
     this.keyboardNav = false;
     this.pendingQuery = "";
@@ -1392,7 +1405,56 @@ class NotePanel {
     this.chips = nav.createDiv({ cls: "thinker-chips" });
     this.chips.addEventListener("dragover", (evt) => this.onChipDragOver(evt));
     this.chips.addEventListener("drop", (evt) => evt.preventDefault());
+    this.chips.addEventListener("click", (evt) => {
+      const chip = evt.target && evt.target.closest ? evt.target.closest(".thinker-chip") : null;
+      if (chip) this.pickChip(chip);
+    });
+    this.chips.addEventListener("keydown", (evt) => {
+      const chip = evt.target && evt.target.closest ? evt.target.closest(".thinker-chip") : null;
+      if (!chip) return;
+      if (evt.key === "Enter" || evt.key === " ") {
+        evt.preventDefault();
+        this.pickChip(chip);
+      }
+    });
     this.list = root.createDiv({ cls: "thinker-list" });
+    this.list.addEventListener("click", (evt) => {
+      const row = evt.target && evt.target.closest ? evt.target.closest(".thinker-note") : null;
+      if (!row) return;
+      const index = Number(row.dataset.idx);
+      const entry = this.rowEntries[index];
+      if (!entry) return;
+      this.selected = index;
+      this.markSelection();
+      this.openEntry(entry, evt.ctrlKey || evt.metaKey);
+    });
+    this.list.addEventListener("contextmenu", (evt) => {
+      const row = evt.target && evt.target.closest ? evt.target.closest(".thinker-note") : null;
+      if (!row) return;
+      const entry = this.rowEntries[Number(row.dataset.idx)];
+      if (!entry) return;
+      evt.preventDefault();
+      this.openMenu(entry, evt);
+    });
+    this.list.addEventListener("keydown", (evt) => {
+      const row = evt.target && evt.target.closest ? evt.target.closest(".thinker-note") : null;
+      if (!row) return;
+      if (evt.key === "ArrowDown" || evt.key === "ArrowUp") {
+        evt.preventDefault();
+        this.move(evt.key === "ArrowDown" ? 1 : -1);
+        this.focusRow();
+        return;
+      }
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        this.selected = Number(row.dataset.idx);
+        this.markSelection();
+        const entry = this.rowEntries[this.selected];
+        if (entry) this.openEntry(entry, evt.altKey);
+        return;
+      }
+      if (evt.key === "Escape") row.blur();
+    });
 
     /* The field sits under the list. Reading the list is the main act here;
        searching is what you do after scanning, so it belongs at the bottom. */
@@ -1403,6 +1465,11 @@ class NotePanel {
       cls: "thinker-search-input",
       attr: { type: "text", spellcheck: "false", autocomplete: "off", placeholder: "" }
     });
+    /* Rebuilt on every keystroke, on purpose. A debounce here looks like an
+       optimisation and is a bug: Enter is handled on the same element, so a fast
+       typist can press it while the list still belongs to the previous query and
+       open the wrong note. The cost of six rebuilds of a forty-row list is smaller
+       than the cost of that. */
     this.input.addEventListener("input", () => {
       this.pendingQuery = this.input.value;
       this.selected = 0;
@@ -1411,7 +1478,6 @@ class NotePanel {
     this.input.addEventListener("keydown", (evt) => this.onKeyDown(evt));
 
     const foot = root.createDiv({ cls: "thinker-foot" });
-    this.footHint = foot.createSpan({ cls: "thinker-foot-hint" });
 
     this.refresh();
   }
@@ -1421,7 +1487,25 @@ class NotePanel {
     this.refreshRows();
     const total = this.deps.index.entries.length;
     this.input.placeholder = t("notes.placeholder", { count: total.toLocaleString(lang === "zh" ? "zh-CN" : "en-US") });
-    this.footHint.setText(this.reordering ? t("notes.reorderOn") : t("notes.hint"));
+  }
+
+  /* One route for both a click and a keypress on a chip. While the row is being
+     arranged a press is a miss, not a filter. */
+  pickChip(chip) {
+    if (this.reordering) return;
+    const key = chip.dataset ? chip.dataset.key : chip.getAttribute("data-key");
+    if (!key || key === this.category) return;
+    this.category = key;
+    this.selected = 0;
+    this.renderChips();
+    this.refreshRows();
+  }
+
+  /* The list has one tab stop, not one per row: a vault with two hundred notes
+     would otherwise put two hundred stops between the page and the footer. */
+  focusRow() {
+    const row = this.rows[this.selected];
+    if (row && row.focus) row.focus();
   }
 
   renderChips() {
@@ -1462,8 +1546,14 @@ class NotePanel {
       this.category = shown.length > 0 ? this.orderKeys(shown)[0].key : "all";
     }
     const ordered = this.orderKeys(shown);
+    /* A chip is a button: it is the only way to change what the list shows, so it
+       has to be reachable without a mouse. One listener on the row handles all of
+       them — the row is rebuilt on every refresh and per-node listeners were being
+       thrown away and re-made a dozen times a session. */
+    const focused = document.activeElement;
+    const focusedKey = focused && focused.dataset ? focused.dataset.key : null;
     for (const item of ordered) {
-      const chip = chips.createSpan({
+      const chip = chips.createEl("button", {
         cls: item.key === this.category ? "thinker-chip is-on" : "thinker-chip",
         text: item.label
       });
@@ -1471,14 +1561,6 @@ class NotePanel {
       chip.draggable = this.reordering;
       if (this.reordering) chip.addClass("is-movable");
       if (item.count != null) chip.createSpan({ cls: "thinker-chip-count", text: String(item.count) });
-      chip.addEventListener("click", () => {
-        /* While the row is being arranged a click is a miss, not a filter. */
-        if (this.reordering) return;
-        this.category = item.key;
-        this.selected = 0;
-        this.renderChips();
-        this.refreshRows();
-      });
       chip.addEventListener("dragstart", (evt) => {
         if (!this.reordering) {
           evt.preventDefault();
@@ -1500,6 +1582,14 @@ class NotePanel {
         this.dragging = null;
         this.persistChipOrder();
       });
+    }
+
+    /* The row was just rebuilt, so the focus that was on a chip is on a node that
+       no longer exists. Put it back on the same chip by key: a keyboard user who
+       changes category should not be dropped at the top of the document. */
+    if (focusedKey) {
+      const again = this.chips.querySelectorAll(".thinker-chip").find((node) => node.dataset.key === focusedKey);
+      if (again && again.focus) again.focus();
     }
 
     /* The plus follows the last range instead of floating at the far right: with
@@ -1539,7 +1629,6 @@ class NotePanel {
       }
     }
     if (this.editBtn) this.editBtn.toggleClass("is-on", this.reordering);
-    if (this.footHint) this.footHint.setText(this.reordering ? t("notes.reorderOn") : t("notes.hint"));
     if (!this.reordering) this.persistChipOrder();
   }
 
@@ -1634,6 +1723,7 @@ class NotePanel {
     const list = this.list;
     list.empty();
     this.rows = [];
+    this.rowEntries = [];
     if (this.results.length === 0) {
       list.createDiv({ cls: "thinker-empty", text: t("notes.empty") });
       return;
@@ -1677,6 +1767,8 @@ class NotePanel {
 
     const addRow = (entry) => {
       const row = list.createDiv({ cls: "thinker-note" });
+      row.setAttribute("role", "button");
+      row.setAttribute("tabindex", "-1");
       if (pinnedSet.has(entry.path)) row.addClass("is-pinned");
       const main = row.createDiv({ cls: "thinker-note-main" });
       main.createDiv({ cls: "thinker-note-title", text: entry.title || t("notes.untitled") });
@@ -1691,16 +1783,9 @@ class NotePanel {
       }
       row.createSpan({ cls: "thinker-note-when", text: relativeTime(entry.mtime) });
       const index = this.rows.length;
+      row.dataset.idx = String(index);
       this.rows.push(row);
-      row.addEventListener("click", (evt) => {
-        this.selected = index;
-        this.markSelection();
-        this.openEntry(entry, evt.ctrlKey || evt.metaKey);
-      });
-      row.addEventListener("contextmenu", (evt) => {
-        evt.preventDefault();
-        this.openMenu(entry, evt);
-      });
+      this.rowEntries.push(entry);
     };
 
     if (!showFolders) {
@@ -1739,7 +1824,11 @@ class NotePanel {
      because the index starts at zero either way. */
   markSelection() {
     (this.rows || []).forEach((row, index) => {
-      if (row && row.toggleClass) row.toggleClass("is-selected", this.keyboardNav === true && index === this.selected);
+      if (!row || !row.toggleClass) return;
+      row.toggleClass("is-selected", this.keyboardNav === true && index === this.selected);
+      /* Roving tab stop: the whole list is one stop, and the arrow keys move it
+         with the cursor. */
+      row.setAttribute("tabindex", index === this.selected ? "0" : "-1");
     });
   }
 
@@ -1756,7 +1845,7 @@ class NotePanel {
         void this.createFromQuery();
         return;
       }
-      const entry = this.results[this.selected];
+      const entry = this.rowEntries[this.selected];
       if (entry) this.openEntry(entry, evt.altKey);
       else void this.createFromQuery();
     } else if (evt.key === "Escape") {
@@ -1877,12 +1966,19 @@ class NotePanel {
 
 const RING_RADIUS = 44;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+/* The status line's meter, r=9 in a 24-unit box. */
+const METER_RADIUS = 9;
+const METER_LENGTH = 2 * Math.PI * METER_RADIUS;
+/* One lap of the stopwatch ring is an hour. A day is six, so a ring drawn against
+   the goal moves a degree every eight minutes and reads as stuck; an hour moves it
+   a degree every ten seconds, which is the feedback a running timer owes you. */
+const WATCH_LAP_SEC = 3600;
 
 class TimerPanel {
   constructor(root, deps) {
     this.root = root;
     this.deps = deps;
-    this.todaySec = 0;
+    this.lastOffset = -1;
   }
 
   render() {
@@ -1913,6 +2009,9 @@ class TimerPanel {
     svg.appendChild(this.arc);
     gauge.appendChild(svg);
 
+    /* The digits are the control, as they have always been: a press starts the
+       session, the next press ends it. Pause and end sit under the dial and only
+       exist while a session does. */
     this.timeEl = gauge.createDiv({ cls: "thinker-time", text: "00:00" });
     this.timeEl.setAttribute("role", "button");
     this.timeEl.setAttribute("tabindex", "0");
@@ -1934,7 +2033,6 @@ class TimerPanel {
     this.stopBtn = this.actions.createEl("button", { cls: "thinker-mini" });
     this.stopBtn.addEventListener("click", () => this.deps.engine.stop());
 
-    this.footEl = root.createDiv({ cls: "thinker-timer-foot" });
     this.refresh();
   }
 
@@ -1944,26 +2042,6 @@ class TimerPanel {
     else engine.stop();
   }
 
-  setTodaySec(sec) {
-    this.todaySec = sec;
-    if (this.footEl && this.deps.engine.state === "idle") this.renderFoot();
-  }
-
-  renderFoot() {
-    const engine = this.deps.engine;
-    if (engine.state === "idle") {
-      this.footEl.setText(t("timer.today", { duration: formatDuration(this.todaySec) }));
-      return;
-    }
-    if (engine.mode === "pomodoro" && engine.round > 0) {
-      this.footEl.setText(
-        `${t("timer.round", { n: engine.round + 1 })} · ${t("timer.today", { duration: formatDuration(this.todaySec) })}`
-      );
-      return;
-    }
-    this.footEl.setText(t("timer.idleHint"));
-  }
-
   refresh() {
     const engine = this.deps.engine;
     const phaseKey = engine.mode === "pomodoro" && engine.phase !== "focus" ? `timer.${engine.phase}` : `timer.${engine.mode}`;
@@ -1971,28 +2049,38 @@ class TimerPanel {
     this.root.dataset.phase = engine.phase;
     this.phaseEl.setText(t(phaseKey));
     this.phaseEl.toggleClass("is-switch", engine.state === "idle");
-    this.actions.toggleClass("is-hidden", engine.state === "idle");
+    const idle = engine.state === "idle";
+    this.actions.toggleClass("is-off", idle);
     this.pauseBtn.setText(t(engine.state === "paused" ? "timer.resume" : "timer.pause"));
     this.stopBtn.setText(t("timer.stop"));
-    this.renderFoot();
+    this.timeEl.setAttribute("aria-label", t(idle ? "timer.start" : "timer.stop"));
     this.onTick();
   }
 
+  /* Both modes draw one arc, and in both it is about the session, because that is
+     the thing that is moving. Pomodoro counts the block down; the stopwatch laps
+     every hour and starts a new lap, which is the only honest way to put an
+     unbounded duration inside a circle. */
   onTick() {
     const engine = this.deps.engine;
+    const settings = this.deps.getSettings();
     const snapshot = engine.snapshot();
     let value;
     let ratio;
     if (snapshot.mode === "pomodoro") {
-      value = snapshot.state === "idle" ? Math.max(1, this.deps.getSettings().focusMinutes) * 60 : snapshot.remainingSec;
-      const target = snapshot.targetSec || Math.max(1, this.deps.getSettings().focusMinutes) * 60;
+      const target = snapshot.targetSec || Math.max(1, settings.focusMinutes) * 60;
+      value = snapshot.state === "idle" ? target : snapshot.remainingSec;
       ratio = Math.max(0, Math.min(1, value / target));
     } else {
       value = snapshot.elapsedSec;
-      ratio = (snapshot.elapsedSec % 3600) / 3600;
+      ratio = (snapshot.elapsedSec % WATCH_LAP_SEC) / WATCH_LAP_SEC;
     }
     this.timeEl.setText(formatClock(value));
-    this.arc.setAttribute("stroke-dashoffset", String(RING_LENGTH * (1 - ratio)));
+    const offset = RING_LENGTH * (1 - ratio);
+    if (Math.abs(offset - this.lastOffset) > 0.05) {
+      this.lastOffset = offset;
+      this.arc.setAttribute("stroke-dashoffset", String(offset));
+    }
   }
 }
 
@@ -2047,6 +2135,7 @@ class CalendarPanel {
       this.month = 1;
       this.year += 1;
     }
+    this.label.setText(t("cal.title", { year: this.year, month: this.month }));
     void this.refresh();
   }
 
@@ -2072,15 +2161,15 @@ class CalendarPanel {
         continue;
       }
       const info = this.monthData.get(key);
-      const day = grid.createDiv({ cls: "thinker-day" });
+      const day = grid.createEl("button", { cls: "thinker-day" });
       if (key === today) day.addClass("is-today");
       if (info && info.focusSec > 0) {
         const level = Math.max(1, Math.min(4, Math.ceil((info.focusSec / maxSec) * 4)));
-        day.addClass(`thinker-heat-${level}`);
+        day.addClass("thinker-heat-" + level);
         day.setAttribute("aria-label", t("cal.heat", { count: info.count }));
+        day.setAttribute("title", key + " · " + formatDuration(info.focusSec));
       }
       day.createSpan({ cls: "thinker-day-num", text: String(Number(key.slice(-2))) });
-      day.createSpan({ cls: "thinker-day-dot" });
       day.addEventListener("click", () => {
         new DayModal(this.deps, key, () => {
           void this.refresh();
@@ -2101,6 +2190,9 @@ class HomeView extends ItemView {
     this.timer = null;
     this.calendar = null;
     this.lastClock = "";
+    this.todaySec = 0;
+    this.dayKey = todayKey();
+    this.lastMeterSec = -1;
   }
 
   getViewType() {
@@ -2134,11 +2226,35 @@ class HomeView extends ItemView {
     root.empty();
     const page = root.createDiv({ cls: "thinker-page" });
 
-    const bar = page.createDiv({ cls: "thinker-clockbar" });
-    const left = bar.createDiv({ cls: "thinker-clock" });
-    this.timeEl = left.createDiv({ cls: "thinker-time-lg" });
-    const right = bar.createDiv({ cls: "thinker-clock-right" });
-    this.dateEl = right.createDiv({ cls: "thinker-date" });
+    /* The status line answers one question in two halves: what time it is, and how
+       much of the day has already gone into work. They used to live at opposite
+       ends of the page, one as the largest type on screen and the other as a
+       footnote under a circle. */
+    const bar = page.createDiv({ cls: "thinker-statusbar" });
+    const clock = bar.createDiv({ cls: "thinker-clock" });
+    this.timeEl = clock.createDiv({ cls: "thinker-time-lg" });
+    this.dateEl = clock.createSpan({ cls: "thinker-date" });
+
+    const meter = bar.createDiv({ cls: "thinker-meter" });
+    this.meterEl = meter;
+    meter.setAttribute("role", "img");
+    const meterSvg = svgEl("svg", { viewBox: "0 0 24 24", class: "thinker-meter-ring" });
+    const meterTrack = svgEl("circle", { cx: 12, cy: 12, r: METER_RADIUS, class: "thinker-meter-track" });
+    this.meterArc = svgEl("circle", {
+      cx: 12,
+      cy: 12,
+      r: METER_RADIUS,
+      class: "thinker-meter-arc",
+      transform: "rotate(-90 12 12)"
+    });
+    this.meterArc.setAttribute("stroke-dasharray", String(METER_LENGTH));
+    this.meterArc.setAttribute("stroke-dashoffset", String(METER_LENGTH));
+    meterSvg.appendChild(meterTrack);
+    meterSvg.appendChild(this.meterArc);
+    meter.appendChild(meterSvg);
+    const meterCopy = meter.createDiv({ cls: "thinker-meter-copy" });
+    this.meterValue = meterCopy.createSpan({ cls: "thinker-meter-value" });
+    this.meterLabel = meterCopy.createSpan({ cls: "thinker-meter-label" });
 
     const grid = page.createDiv({ cls: "thinker-grid" });
     this.grid = grid;
@@ -2175,6 +2291,7 @@ class HomeView extends ItemView {
     this.calendar.render();
 
     this.updateClock();
+    this.updateMeter(true);
   }
 
   applySide() {
@@ -2185,28 +2302,58 @@ class HomeView extends ItemView {
   updateClock() {
     const now = new Date();
     const settings = this.deps.getSettings();
+    /* Midnight is a data change, not just a text change: the day the page is
+       reporting on has become a different day, so the total has to be re-read
+       instead of carried over into the new date. */
+    const key = todayKey();
+    if (key !== this.dayKey) {
+      this.dayKey = key;
+      this.lastClock = "";
+      void this.refreshToday();
+    }
     const value = settings.showSeconds
       ? `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`
       : `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
     if (value === this.lastClock) return;
     this.lastClock = value;
-    this.timeEl.setText(value);
+    if (this.timeEl) this.timeEl.setText(value);
     const weekday = weekdayLabels(1)[(now.getDay() + 6) % 7];
-    this.dateEl.setText(
-      lang === "zh"
-        ? `周${weekday} · ${now.getMonth() + 1} 月 ${now.getDate()} 日`
-        : `${weekday} · ${now.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-    );
+    if (this.dateEl) {
+      this.dateEl.setText(
+        lang === "zh"
+          ? `周${weekday} · ${now.getMonth() + 1} 月 ${now.getDate()} 日`
+          : `${weekday} · ${now.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      );
+    }
+  }
+
+  /* The meter is the same quantity as the ring, at one fifth the size: today
+     against the goal, counting the session that is running. It repaints only when
+     the second has actually moved. */
+  updateMeter(force) {
+    const settings = this.deps.getSettings();
+    const goalSec = Math.max(1, settings.dailyGoalMinutes) * 60;
+    const daySec = Math.round(dayFocusSec(this.todaySec, this.deps.engine));
+    if (!force && daySec === this.lastMeterSec) return;
+    this.lastMeterSec = daySec;
+    const offset = METER_LENGTH * (1 - dayRatio(daySec, goalSec));
+    if (this.meterArc) this.meterArc.setAttribute("stroke-dashoffset", String(offset));
+    if (this.meterValue) this.meterValue.setText(formatDuration(daySec));
+    if (this.meterLabel) this.meterLabel.setText(`/ ${formatDuration(goalSec)}`);
+    if (this.meterEl) this.meterEl.setAttribute("aria-label", t("clock.focusToday", { duration: formatDuration(daySec) }));
   }
 
   async refreshToday() {
-    const records = await this.deps.storage.getDay(todayKey());
-    const sec = sumFocusDuration(records);
-    if (this.timer) this.timer.setTodaySec(sec);
+    const key = todayKey();
+    this.dayKey = key;
+    const records = await this.deps.storage.getDay(key);
+    this.todaySec = sumFocusDuration(records);
+    this.updateMeter(true);
   }
 
   onTick() {
     this.updateClock();
+    this.updateMeter(false);
     if (this.timer) this.timer.onTick();
   }
 
@@ -2421,9 +2568,6 @@ class CreateModal extends Modal {
       if (pick.row && pick.row.classList) {
         if (on) pick.row.classList.add("is-on");
         else pick.row.classList.remove("is-on");
-      }
-      if (pick.label && pick.label.style) {
-        pick.label.style.color = on ? "var(--tk-accent)" : "";
       }
     }
   }
@@ -3019,7 +3163,7 @@ class StatsView extends ItemView {
       }
       const track = col.createDiv({ cls: "thinker-bar-track" });
       const bar = track.createDiv({ cls: "thinker-bar" });
-      bar.style.setProperty("--thinker-bar", `${values[index] > 0 ? Math.max(4, Math.round((values[index] / max) * 100)) : 0}%`);
+      bar.style.setProperty("--tk-bar-h", `${values[index] > 0 ? Math.max(4, Math.round((values[index] / max) * 100)) : 0}%`);
       col.createDiv({ cls: "thinker-bar-day", text: names[index] });
       col.addEventListener("click", () => this.drill(key));
     });
@@ -3253,8 +3397,8 @@ class ThinkerSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName(t("settings.listLimit")).addSlider((slider) =>
       slider
-        .setLimits(10, 200, 10)
-        .setValue(Math.min(200, Math.max(10, settings.listLimit)))
+        .setLimits(10, 400, 10)
+        .setValue(Math.min(400, Math.max(10, settings.listLimit)))
         .setDynamicTooltip()
         .onChange((value) => {
           settings.listLimit = value;
@@ -3394,10 +3538,6 @@ class ThinkerSettingTab extends PluginSettingTab {
         this.plugin.refreshAll();
       });
     });
-
-    new Setting(containerEl)
-      .setName(t("settings.dataPath"))
-      ;
 
     new Setting(containerEl).setName(t("settings.diaryFolder")).addText((text) => {
       text.setPlaceholder("Life/Daily Notes");
@@ -3639,17 +3779,19 @@ class ThinkerPlugin extends Plugin {
     const split = this.app.workspace.leftSplit;
     if (!split || split.collapsed) return;
     /* The transition is removed for this one collapse: on startup the sidebar is
-       otherwise seen sliding shut, which reads as a flicker. */
+       otherwise seen sliding shut, which reads as a flicker. A class rather than an
+       inline style, because the plugin stylesheet is where the plugin says how
+       things look. */
     const el = split.containerEl;
-    if (el && el.style) el.style.transition = "none";
+    if (el && el.addClass) el.addClass("is-no-transition");
     try {
       split.collapse();
     } catch (error) {
       console.error("Thinker: could not collapse the left sidebar", error);
     }
-    if (el && el.style) {
+    if (el && el.removeClass) {
       const restore = () => {
-        el.style.transition = "";
+        el.removeClass("is-no-transition");
       };
       if (window.requestAnimationFrame) window.requestAnimationFrame(restore);
       else window.setTimeout(restore, 0);

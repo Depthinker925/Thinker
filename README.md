@@ -1,8 +1,8 @@
 # Thinker
 
-A start page for Obsidian: a clock, the vault's notes as an outline, a focus timer, and a month of focus history. Desktop only.
+A start page for Obsidian: a clock, the vault's notes as an outline, a focus timer, and a month of focus history.
 
-Obsidian 起始页插件：一个视图里放着时钟、笔记清单、专注计时器和一张月历。仅桌面端。
+Obsidian 起始页插件：一个视图里放着时钟、笔记清单、专注计时器和一张月历。
 
 ![Thinker](assets/Thinker.png)
 
@@ -16,15 +16,10 @@ Obsidian 起始页插件：一个视图里放着时钟、笔记清单、专注�
 | Data folder / 数据目录 | `FocusLog` |
 
 ---
-## Buy me a coffee (optional) / 请我喝咖啡（可选）
-
-This plugin is free and nothing is gated. If it saves you time, you can buy me a coffee. Any amount, entirely optional.
-
-这个插件免费，功能不设限。如果它替你省了时间，可以请我喝杯咖啡，金额随意。
-
-| Alipay 支付宝 | WeChat Pay 微信 |
+## Buy me a Coffee  |  支持作者
+| 微信支付 WeChat | 支付宝 AliPay |
 | --- | --- |
-| <img src="assets/AliPay.jpg" width="200" alt="Alipay QR code"> | <img src="assets/WeChat.jpg" width="200" alt="WeChat Pay QR code"> |
+| ![WeChat](assets/WeChat.jpg) | ![Alipay](assets/Alipay.jpg) |
 
 ---
 
@@ -38,7 +33,9 @@ Download `main.js`, `manifest.json` and `styles.css`, put them in `<vault>/.obsi
 
 Thinker registers one view. It opens with Obsidian and collapses the left sidebar so the page fills the window. It closes like any other tab. Both come with their own switch.
 
-The page has two columns, notes on the left or on the right. The clock hides seconds by default, since a digit that moves every second pulls the eye back.
+The top line is one answer: the clock, the date, and today's focus against the daily goal. The clock hides seconds by default, since a digit that moves every second pulls the eye back.
+
+Below it are two columns, notes on the left or on the right. The side column holds the timer first and the calendar under it.
 
 ### Notes
 
@@ -50,7 +47,11 @@ Search runs over titles or over full text, and full-text hits show a snippet. Or
 
 ### Timer
 
-Two modes: pomodoro and stopwatch. Pomodoro is the default, with 25 minutes of focus, a 5 minute short break and a 15 minute long break, plus a long break every four rounds. Auto cycle can be turned off.
+Two modes: pomodoro and stopwatch. Stopwatch counts up until it is ended; pomodoro counts down the configured focus block of 25 minutes, then a 5 minute short break, a 15 minute long break every four rounds. Auto cycle can be turned off.
+
+The digits are the control: one press starts a session, the next press ends it. Pause and end sit under the dial and only appear while a session is running.
+
+The ring measures the session. Pomodoro draws the block counting down; the stopwatch laps once an hour and starts a new lap, because an unbounded duration has to be given some window before it can be drawn at all.
 
 A session ends with a chime. Vibration and system notices are switches of their own. Sessions shorter than the configured floor are not written. A record dialog opens after each round, for a tag or for skipping it.
 
@@ -100,17 +101,23 @@ rest-count: 3
 
 ### Changelog
 
-#### 3.3.2
+#### 3.4.0
 
-This release changes how a note is opened, and nothing else.
+A redesign of the start page, with the same data, the same commands and the same settings.
 
-In 3.3.1 every click on a note added a tab in the main area. The page is an `ItemView`, and Obsidian will not navigate a leaf away from a view that is not a file view, so each `openFile` on the active leaf produced a new tab instead of reusing the one already there.
+The page is now read by how often a question is asked. Where the day stands comes first, as one line: the clock, the date, and today's focus against the daily goal. What to start comes second: the notes column, and the timer as the first card of the side column. How the month went comes last.
 
-A note now goes to the tab that already holds it. If it is not open anywhere, the note replaces the content of the current note tab. A new tab appears only when the main area has no note tab at all. Ctrl click and the "open in new tab" menu entry behave as before.
+The notes column lost its footer hint, and the timer lost its caption. Neither was reading; both were teaching something the page already showed.
+
+The digits are the control again: a press starts, a press ends. Pause and end appear under the dial only while a session runs.
+
+The ring measures the session rather than the day. A day ring against a six hour goal moves one degree every eight minutes, which is indistinguishable from a broken one, so the day's total moved to the status line where a slow gauge belongs, and the dial went back to what it is good at: showing that something is moving. Pomodoro counts its block down; the stopwatch laps every hour.
+
+Under the surface: the stylesheet was rebuilt on one token layer with a single fallback for `color-mix`, the button reset and the components that size themselves now sit on the same footing instead of one silently flattening the other, reduced motion reaches the tokens it claims to cover, and the aggregate transition block that was swallowing two-property transitions is gone.
 
 ### Compatibility
 
-`data.json` keeps the same shape as 3.3.1, so an in-place upgrade needs no migration. The plugin needs Obsidian 1.13.0 or newer and does not run on mobile.
+`data.json` keeps the same shape as 3.3.1, so an in-place upgrade needs no migration. Records are read from the same `FocusLog` files. The plugin needs Obsidian 1.13.0 or newer and does not run on mobile.
 
 ---
 
@@ -124,7 +131,9 @@ A note now goes to the tab that already holds it. If it is not open anywhere, th
 
 Thinker 只注册一个视图。它随 Obsidian 启动打开，打开时收起左侧边栏让页面占满窗口，也可以像普通标签页一样关掉；启动打开与收起边栏各有一个开关。
 
-页面分两栏，笔记在左或在右。时钟默认不显示秒，因为每秒跳动的数字会把视线不断拉回去。
+最上面一行同时回答两件事：时钟、日期、今日专注对每日目标。时钟默认不显示秒，因为每秒跳动的数字会把视线不断拉回去。
+
+下面分两栏，笔记在左或在右。右栏从上到下是计时器与日历，计时器在前。
 
 ### 笔记清单
 
@@ -136,7 +145,11 @@ Thinker 只注册一个视图。它随 Obsidian 启动打开，打开时收起�
 
 ### 计时器
 
-两种模式，番茄钟与正计时，默认番茄钟。番茄钟默认 25 分钟专注、5 分钟短休、15 分钟长休，每 4 轮进一次长休，自动循环可关。
+两种模式，番茄钟与正计时，默认番茄钟。番茄钟默认 25 分钟专注、5 分钟短休、15 分钟长休，每 4 轮进一次长休，自动循环可关。正计时往上走，按结束才停。
+
+数字就是控件：按一下开始，再按一下结束。暂停与结束在表盘下方，只在会话进行时出现。
+
+表盘上的环量的是这一段。番茄钟画这一轮的倒计时；正计时每小时走一圈，从头再走，因为无上限的时长总得给一个窗口才画得出来。
 
 一轮结束播放提示音，震动与系统通知是两个独立开关。短于设定秒数的会话不写进记录。每轮结束弹出记录窗口，补标签或直接略过。
 
@@ -186,14 +199,21 @@ rest-count: 3
 
 ### 更新日志
 
-#### 3.3.2
+#### 3.4.0
 
-这一版只改笔记的打开方式，别的没动。
+起始页重做一遍，数据、命令、设置都不变。
 
-3.3.1 里点一条笔记，主区域就多一页。主页是 `ItemView`，Obsidian 不会把非文件视图的标签页交给笔记，于是每次对当前标签页调 `openFile` 都新建一页，而不是复用已有的那一页。
+页面按问题被问到的频次重排。今天到了哪一步放最上面，一行说清：时钟、日期、今日专注对每日目标。要开始什么放中间：笔记列，以及右栏第一张卡片的计时器。这个月过得怎么样放最后一层。
 
-现在笔记先找已经打开它的标签页，找到就跳过去；没开过，替换当前笔记页的内容；主区域一个笔记页都没有，才新建一页。Ctrl 点击与右键的新标签页打开保持原样。
+笔记列底部的提示与计时器下方的说明都删了。两处都在教一件页面本身已经说清的事。
+
+数字重新成为控件：按一下开始，再按一下结束。暂停与结束只在会话进行时出现在表盘下方。
+
+环量的是这一段，不是一整天。对着六小时的目标，环每八分钟才走一度，看上去和坏了一样；今日合计因此移到状态行，那里本来就该放一个慢速的量，表盘则回到它擅长的事：让人看见东西在动。番茄钟画这一轮的倒计时，正计时每小时走一圈，从头再走。
+
+底层：样式表重建在一套令牌上，`color-mix` 只有一个后备分支；按钮重置与给出尺寸的组件现在站在一起，不再出现一个悄悄压平另一个；减弱动效终于改到它声称覆盖的令牌上；吞掉双属性过渡的聚合块已删除。
+
 
 ### 兼容
 
-`data.json` 的格式与 3.3.1 相同，原地升级不需要迁移。插件要求 Obsidian 1.13.0 以上，不支持移动端。
+`data.json` 的格式与 3.3.1 相同，原地升级不需要迁移；记录仍从原来的 `FocusLog` 文件读。插件要求 Obsidian 1.13.0 以上，不支持移动端。

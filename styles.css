@@ -1,13 +1,18 @@
 /* Thinker — 纸面与一条线 (paper and one rule)
 
    The whole page is one material: the page background. Nothing is a filled card,
-   nothing is raised. Structure comes from exactly two devices — hairlines, and a
-   single accent that appears in five places only (weekday, active tab, pinned
-   marker, ring, today's cell). Everything else is three greys.
+   nothing is raised. Structure comes from two devices only — hairlines, and a
+   single accent that appears where a decision lives (the day's ring, today's cell,
+   the open tab).
 
-   Tokens below are the only legal values: spacing 4/8/12/16/24/32, radius 6/10/12,
-   type 11/12/13/28/52. If a rule needs a number that is not on those scales, the
-   rule is wrong. */
+   The page is read in one order, by how often the question is asked: where the day
+   stands (status line), what to start (notes and timer), how the month went (one
+   layer down). The clock is context, so it is body-sized; the timer is the only
+   thing you press, so it is the largest object on the page.
+
+   Tokens below are the only legal values: spacing 4/8/12/16/24/32/40, radius
+   6/10/14, type 11/12/13/16/18/26, durations 90/130/240. If a rule needs a number
+   that is not on those scales, the rule is wrong. */
 
 /* The tokens sit on both html and body on purpose. A custom property resolves its
    own var() where it is declared, not where it is used, so a token declared only on
@@ -25,10 +30,11 @@ body {
 	--tk-4: 16px;
 	--tk-5: 24px;
 	--tk-6: 32px;
+	--tk-7: 40px;
 
 	--tk-r-sm: 6px;
 	--tk-r-md: 10px;
-	--tk-r-lg: 12px;
+	--tk-r-lg: 14px;
 
 	--tk-hair: var(--background-modifier-border, rgba(128, 128, 128, 0.24));
 	--tk-accent: var(--text-accent, var(--interactive-accent, var(--color-accent, #a55b2a)));
@@ -37,10 +43,72 @@ body {
 	--tk-fs-xs: 11px;
 	--tk-fs-sm: 12px;
 	--tk-fs-md: 13px;
-	--tk-fs-lg: 28px;
+	--tk-fs-lg: 16px;
+	--tk-fs-xl: 18px;
+	--tk-fs-digits: 28px;
 
+	--tk-dur-fast: 90ms;
 	--tk-dur: 130ms;
+	--tk-dur-slow: 240ms;
 	--tk-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+	--tk-row: 40px;
+	--tk-row-tight: 30px;
+	--tk-target: 26px;
+
+	--tk-arc: 3.5;
+
+	/* Every tint is one colour at one opacity, so a light theme inverts for free and
+	   a theme whose accent is a dull grey still reads as depth rather than as a
+	   second colour. */
+	--tk-track: color-mix(in srgb, var(--text-faint) 24%, transparent);
+	--tk-tint: color-mix(in srgb, var(--text-faint) 10%, transparent);
+	--tk-heat-1: color-mix(in srgb, var(--text-faint) 13%, transparent);
+	--tk-heat-2: color-mix(in srgb, var(--text-faint) 24%, transparent);
+	--tk-heat-3: color-mix(in srgb, var(--text-faint) 37%, transparent);
+	--tk-heat-4: color-mix(in srgb, var(--text-faint) 52%, transparent);
+	--tk-aheat-1: color-mix(in srgb, var(--tk-accent) 14%, transparent);
+	--tk-aheat-2: color-mix(in srgb, var(--tk-accent) 26%, transparent);
+	--tk-aheat-3: color-mix(in srgb, var(--tk-accent) 40%, transparent);
+	--tk-aheat-4: color-mix(in srgb, var(--tk-accent) 56%, transparent);
+	--tk-soft: color-mix(in srgb, var(--tk-accent) 13%, transparent);
+	--tk-seg: color-mix(in srgb, var(--tk-accent) 68%, transparent);
+	--tk-bar: color-mix(in srgb, var(--tk-accent) 52%, transparent);
+	--tk-outline: color-mix(in srgb, var(--text-muted) 45%, transparent);
+	--tk-accent-edge: color-mix(in srgb, var(--tk-accent) 55%, transparent);
+
+	/* Rest is the one place a second hue is allowed: it is a different activity,
+	   and it is always paired with a different shape, never colour alone. */
+	--tk-rest: var(--color-cyan, #22b8cf);
+	--tk-rest-soft: color-mix(in srgb, var(--tk-rest) 12%, transparent);
+	--tk-rest-seg: color-mix(in srgb, var(--tk-rest) 42%, transparent);
+}
+
+/* One fallback for all of them. Without colour-mix a heat cell would lose its fill
+   entirely and the calendar would read as forty two identical squares, so the
+   greys fall back to fixed alpha and the accent tints fall back to the same greys.
+   Depth survives; hue does not. */
+@supports not (background: color-mix(in srgb, red 10%, transparent)) {
+	:root,
+	body {
+		--tk-track: rgba(128, 128, 128, 0.26);
+		--tk-tint: rgba(128, 128, 128, 0.1);
+		--tk-heat-1: rgba(128, 128, 128, 0.13);
+		--tk-heat-2: rgba(128, 128, 128, 0.24);
+		--tk-heat-3: rgba(128, 128, 128, 0.37);
+		--tk-heat-4: rgba(128, 128, 128, 0.52);
+		--tk-aheat-1: rgba(128, 128, 128, 0.16);
+		--tk-aheat-2: rgba(128, 128, 128, 0.3);
+		--tk-aheat-3: rgba(128, 128, 128, 0.44);
+		--tk-aheat-4: rgba(128, 128, 128, 0.6);
+		--tk-soft: rgba(128, 128, 128, 0.13);
+		--tk-seg: rgba(128, 128, 128, 0.6);
+		--tk-bar: rgba(128, 128, 128, 0.45);
+		--tk-outline: rgba(128, 128, 128, 0.45);
+		--tk-accent-edge: rgba(128, 128, 128, 0.45);
+		--tk-rest-soft: rgba(34, 184, 207, 0.12);
+		--tk-rest-seg: rgba(34, 184, 207, 0.42);
+	}
 }
 
 .view-content.thinker-home {
@@ -65,8 +133,14 @@ body {
 }
 
 /* Every control on this page is text you can press. Obsidian gives <button> a
-   background, a border and a shadow; none of that belongs here. Component rules
-   below re-add size where an element is genuinely an icon target. */
+   background, a border and a shadow; none of that belongs here.
+
+   This rule has to beat the app's own `button` rule and any theme that styles one,
+   so it carries the view class. Every component rule below carries that class too,
+   which is why they still win: a chip or a heat cell declares its own fill and
+   padding one class deeper, and a :hover one deeper again. The other way round —
+   a weightless reset — looked tidier and was wrong: it tied with the app's rule and
+   lost on load order, so every chip on the page came back as a grey button. */
 .view-content.thinker-home button {
 	height: auto;
 	min-height: 0;
@@ -81,9 +155,15 @@ body {
 	color: inherit;
 }
 
-/* ---------- masthead: the clock, and nothing competing with it ---------- */
+/* ---------- status line: where the day stands ----------
 
-.thinker-clockbar {
+   One line answers both halves of the same question. The clock is context and is
+   sized like a heading, not like a hero: the page has exactly one hero, and it is
+   the thing you press. The meter on the right is today against the goal — the
+   number he checks before starting, which used to live in a footnote under a
+   circle three hundred pixels away. */
+
+.view-content.thinker-home .thinker-statusbar {
 	flex: 0 0 auto;
 	display: flex;
 	align-items: baseline;
@@ -93,80 +173,112 @@ body {
 	border-bottom: 0.5px solid var(--tk-hair);
 }
 
-.thinker-clock {
+.view-content.thinker-home .thinker-clock {
 	display: flex;
 	align-items: baseline;
 	gap: var(--tk-3);
 	min-width: 0;
 }
 
-.thinker-time-lg {
-	font-size: clamp(34px, 3.8cqw, 52px);
-	line-height: 0.9;
-	letter-spacing: -0.03em;
+.view-content.thinker-home .thinker-time-lg {
+	font-size: clamp(24px, 2.2cqw, 28px);
+	line-height: 1;
+	letter-spacing: -0.02em;
 	font-variant-numeric: tabular-nums;
 	font-feature-settings: "tnum" 1;
 	color: var(--text-normal);
 }
 
-.thinker-clock-right {
-	display: flex;
-	align-items: baseline;
-	gap: var(--tk-3);
-	flex: 0 0 auto;
-}
-
-.thinker-date {
+.view-content.thinker-home .thinker-date {
 	font-size: var(--tk-fs-md);
 	color: var(--text-muted);
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
 }
 
-.thinker-today {
-	display: none;
+.view-content.thinker-home .thinker-meter {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: var(--tk-2);
+}
+
+.view-content.thinker-home .thinker-meter-ring {
+	display: block;
+	width: 20px;
+	height: 20px;
+}
+
+.view-content.thinker-home .thinker-meter-track {
+	fill: none;
+	stroke: var(--tk-track);
+	stroke-width: 2.5;
+}
+
+.view-content.thinker-home .thinker-meter-arc {
+	fill: none;
+	stroke: var(--tk-accent);
+	stroke-width: 2.5;
+	stroke-linecap: round;
+	transition: stroke-dashoffset var(--tk-dur-slow) linear;
+}
+
+.view-content.thinker-home .thinker-meter-copy {
+	display: flex;
+	align-items: baseline;
+	gap: var(--tk-1);
+	font-variant-numeric: tabular-nums;
+}
+
+.view-content.thinker-home .thinker-meter-value {
+	font-size: var(--tk-fs-sm);
+	color: var(--text-normal);
+}
+
+.view-content.thinker-home .thinker-meter-label {
+	font-size: var(--tk-fs-xs);
+	color: var(--text-faint);
 }
 
 /* ---------- the grid ---------- */
 
-.thinker-grid {
+.view-content.thinker-home .thinker-grid {
 	flex: 1 1 auto;
 	min-height: 0;
-	max-height: 720px;
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) clamp(300px, 30%, 420px);
+	grid-template-columns: minmax(0, 1fr) clamp(320px, 26%, 380px);
 	grid-template-areas: "notes aside";
 	gap: var(--tk-6);
 }
 
-.thinker-grid.is-swapped {
-	grid-template-columns: clamp(300px, 30%, 420px) minmax(0, 1fr);
+.view-content.thinker-home .thinker-grid.is-swapped {
+	grid-template-columns: clamp(320px, 26%, 380px) minmax(0, 1fr);
 	grid-template-areas: "aside notes";
 }
 
-.thinker-notes-box {
+.view-content.thinker-home .thinker-notes-box {
 	grid-area: notes;
 	min-width: 0;
 	min-height: 0;
 	display: flex;
 }
 
-.thinker-aside {
+/* The column hangs from its top. It used to be centred, which pushed the timer
+   into the middle of the window while the notes started at the top; two columns
+   that start in different places read as two unrelated pages. */
+.view-content.thinker-home .thinker-aside {
 	grid-area: aside;
 	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	/* The timer and the calendar sit in the middle of the column instead of hanging
-	   from its top. `safe` keeps them reachable when the window is too short to
-	   centre them: the alignment falls back to the start rather than clipping. */
-	justify-content: safe center;
+	justify-content: flex-start;
 	gap: var(--tk-4);
 	overflow-y: auto;
 	scrollbar-width: thin;
 }
 
 /* No fill, one hairline. A panel is drawn, not raised. */
-.thinker-card {
+.view-content.thinker-home .thinker-card {
 	background: transparent;
 	border: 0.5px solid var(--tk-hair);
 	border-radius: var(--tk-r-lg);
@@ -176,7 +288,7 @@ body {
 
 /* ---------- notes ---------- */
 
-.thinker-notes {
+.view-content.thinker-home .thinker-notes {
 	flex: 1 1 auto;
 	min-height: 0;
 	width: 100%;
@@ -185,13 +297,13 @@ body {
 }
 
 /* A field, not an underline: this is the one thing on the page you type into. */
-.thinker-search {
+.view-content.thinker-home .thinker-search {
 	flex: 0 0 auto;
 	margin-top: var(--tk-2);
 	display: flex;
 	align-items: center;
 	gap: var(--tk-2);
-	height: 40px;
+	height: var(--tk-7);
 	padding: 0 var(--tk-3);
 	border: 0.5px solid var(--tk-hair);
 	border-radius: var(--tk-r-md);
@@ -204,26 +316,26 @@ body {
    State is carried by weight and by grey: an open tab darkens and keeps a hairline
    under it, a pressed button darkens, a selected row takes a grey edge. */
 
-.thinker-search:focus-within {
+.view-content.thinker-home .thinker-search:focus-within {
 	border-color: var(--text-muted);
 }
 
-.thinker-search-icon {
+.view-content.thinker-home .thinker-search-icon {
 	display: flex;
 	align-items: center;
 	color: var(--text-faint);
 	flex: 0 0 auto;
 }
 
-.thinker-search-icon .svg-icon {
+.view-content.thinker-home .thinker-search-icon .svg-icon {
 	width: 15px;
 	height: 15px;
 }
 
 /* Two classes, not one: themes ship `input[type="text"] { width: 100% }`, which
    would push the field past its container and under the icon. */
-.thinker-search .thinker-search-input,
-.thinker-search .thinker-search-input:focus {
+.view-content.thinker-home .thinker-search .thinker-search-input,
+.view-content.thinker-home .thinker-search .thinker-search-input:focus {
 	flex: 1 1 0;
 	width: auto;
 	max-width: 100%;
@@ -238,29 +350,33 @@ body {
 	color: var(--text-normal);
 }
 
-.thinker-search-input::placeholder {
+.view-content.thinker-home .thinker-search-input::placeholder {
 	color: var(--text-faint);
 }
 
 /* Two levels of navigation share one block. The rule belongs to the block, not
    to the first row, so it always closes whichever level is showing. */
-.thinker-nav {
+.view-content.thinker-home .thinker-nav {
 	flex: 0 0 auto;
 	border-bottom: 0.5px solid var(--tk-hair);
 }
 
-/* Tabs, not pills: an underline is quieter than a filled capsule. */
-.thinker-chips {
+/* Tabs, not pills: an underline is quieter than a filled capsule. The chip is a
+   button now, so it is reachable and it takes the focus ring; the reset above has
+   already taken the box off it. */
+.view-content.thinker-home .thinker-chips {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--tk-5);
-	padding: var(--tk-1) 0 0;
+	/* One gutter for the whole column: folder headings, chips and rows all start
+	   their text on the same line, and the row tint still runs edge to edge. */
+	padding: var(--tk-1) var(--tk-3) 0;
 }
 
-.thinker-chip {
+.view-content.thinker-home .thinker-chip {
 	position: relative;
-	padding: 7px 0;
+	padding: var(--tk-2) 0;
 	font-size: var(--tk-fs-sm);
 	color: var(--text-muted);
 	cursor: pointer;
@@ -268,18 +384,18 @@ body {
 	transition: color var(--tk-dur) var(--tk-ease);
 }
 
-.thinker-chip:hover {
+.view-content.thinker-home .thinker-chip:hover {
 	color: var(--text-normal);
 }
 
 /* The open range darkens to the reading colour and keeps a hairline under it: with
    folders on the row, weight alone was too quiet to say which one is open. */
-.thinker-chip.is-on {
+.view-content.thinker-home .thinker-chip.is-on {
 	color: var(--text-normal);
 	box-shadow: inset 0 -2px 0 var(--text-muted);
 }
 
-.thinker-chip-count {
+.view-content.thinker-home .thinker-chip-count {
 	margin-left: var(--tk-1);
 	font-size: var(--tk-fs-xs);
 	color: var(--text-faint);
@@ -292,38 +408,38 @@ body {
    inside a padding that cancels its own margin, so switching the mode on moves
    nothing: only the size and the cursor change. */
 
-.thinker-chips.is-reordering .thinker-chip {
+.view-content.thinker-home .thinker-chips.is-reordering .thinker-chip {
 	margin-inline: calc(-1 * var(--tk-1));
 	padding-inline: var(--tk-1);
-	border-radius: 3px;
+	border-radius: var(--tk-r-sm);
 	cursor: grab;
 	user-select: none;
-	box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--text-muted) 45%, transparent);
+	box-shadow: inset 0 0 0 0.5px var(--tk-outline);
 }
 
 /* Inside the mode the accent underline would read as the drop target, so the
    open tab keeps the plain text colour and lets the outline do the talking. */
-.thinker-chips.is-reordering .thinker-chip.is-on {
+.view-content.thinker-home .thinker-chips.is-reordering .thinker-chip.is-on {
 	color: var(--text-normal);
-	box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--text-muted) 45%, transparent);
+	box-shadow: inset 0 0 0 0.5px var(--tk-outline);
 }
 
-.thinker-chips.is-reordering .thinker-chip:hover {
+.view-content.thinker-home .thinker-chips.is-reordering .thinker-chip:hover {
 	color: var(--text-normal);
 	background: var(--tk-fill);
 }
 
-.thinker-chip.is-dragging {
+.view-content.thinker-home .thinker-chip.is-dragging {
 	opacity: 0.35;
 	cursor: grabbing;
 }
 
-.thinker-list {
+.view-content.thinker-home .thinker-list {
 	flex: 1 1 auto;
 	min-height: 0;
 	overflow-y: auto;
-	margin: 0 calc(-1 * var(--tk-2));
-	padding: var(--tk-2) var(--tk-2) 0;
+	margin: 0;
+	padding: var(--tk-2) 0 0;
 	scrollbar-width: thin;
 }
 
@@ -333,14 +449,14 @@ body {
    alone: nothing is indented, nothing is prefixed. The largest text on this panel
    is a top folder, its child steps down, notes stay at body size. */
 
-.thinker-folder {
+.view-content.thinker-home .thinker-folder {
 	display: flex;
 	align-items: baseline;
 	gap: var(--tk-2);
 	padding: 0 var(--tk-3);
 }
 
-.thinker-folder-name {
+.view-content.thinker-home .thinker-folder-name {
 	flex: 1 1 auto;
 	min-width: 0;
 	font-weight: var(--font-semibold, 600);
@@ -350,98 +466,99 @@ body {
 	text-overflow: ellipsis;
 }
 
-.thinker-folder-count {
+.view-content.thinker-home .thinker-folder-count {
 	flex: 0 0 auto;
 	font-size: var(--tk-fs-xs);
 	color: var(--text-faint);
 	font-variant-numeric: tabular-nums;
 }
 
-.thinker-folder.is-level-1 {
+.view-content.thinker-home .thinker-folder.is-level-1 {
 	margin-top: var(--tk-4);
 	padding-top: var(--tk-3);
 	padding-bottom: var(--tk-1);
 	border-top: 0.5px solid var(--tk-hair);
 }
 
-.thinker-list > .thinker-folder.is-level-1:first-child {
+.view-content.thinker-home .thinker-list > .thinker-folder.is-level-1:first-child {
 	margin-top: var(--tk-1);
 	padding-top: 0;
 	border-top: none;
 }
 
-.thinker-folder.is-level-1 .thinker-folder-name {
-	font-size: 18px;
+.view-content.thinker-home .thinker-folder.is-level-1 .thinker-folder-name {
+	font-size: var(--tk-fs-xl);
 	line-height: 1.3;
 }
 
-.thinker-folder.is-level-2 {
+.view-content.thinker-home .thinker-folder.is-level-2 {
 	margin-top: var(--tk-4);
 	padding-bottom: var(--tk-1);
 }
 
-.thinker-folder.is-level-2 .thinker-folder-name {
-	font-size: 16px;
+.view-content.thinker-home .thinker-folder.is-level-2 .thinker-folder-name {
+	font-size: var(--tk-fs-lg);
 	line-height: 1.3;
 }
 
-.thinker-folder.is-level-3 {
+.view-content.thinker-home .thinker-folder.is-level-3 {
 	margin-top: var(--tk-3);
 }
 
-.thinker-folder.is-level-3 .thinker-folder-name {
-	font-size: 14px;
+.view-content.thinker-home .thinker-folder.is-level-3 .thinker-folder-name {
+	font-size: var(--tk-fs-md);
 	line-height: 1.35;
 	color: var(--text-muted);
 }
 
-.thinker-folder.is-level-4 {
+.view-content.thinker-home .thinker-folder.is-level-4 {
 	margin-top: var(--tk-2);
 }
 
-.thinker-folder.is-level-4 .thinker-folder-name {
-	font-size: 13px;
+.view-content.thinker-home .thinker-folder.is-level-4 .thinker-folder-name {
+	font-size: var(--tk-fs-md);
 	line-height: 1.4;
 	color: var(--text-muted);
 }
 
-.thinker-note {
+/* A row is a button in behaviour (role, tab stop) and a line in appearance. */
+.view-content.thinker-home .thinker-note {
 	position: relative;
 	display: flex;
 	align-items: center;
 	gap: var(--tk-3);
-	height: 44px;
+	height: var(--tk-row);
 	padding: 0 var(--tk-3);
 	border-radius: var(--tk-r-md);
 	cursor: pointer;
 	transition: background-color var(--tk-dur) var(--tk-ease);
 }
 
-/* A one-line row: 44px was the height of a name plus the path under it, so a row
+/* A one-line row: 40px was the height of a name plus the path under it, so a row
    that no longer has a path keeps the name and gives the rest back. The list is
    compact everywhere the path is gone, in 全部 / 最近 it stays tall, and a row
    that still carries a search snippet keeps the taller box instead of squeezing
    two lines into one. */
-.thinker-list.is-compact .thinker-note {
-	height: 32px;
+.view-content.thinker-home .thinker-list.is-compact .thinker-note {
+	height: var(--tk-row-tight);
 }
 
-.thinker-list.is-compact .thinker-note.is-two-line {
-	height: 44px;
+.view-content.thinker-home .thinker-list.is-compact .thinker-note.is-two-line {
+	height: var(--tk-row);
 }
 
-.thinker-note:hover {
+.view-content.thinker-home .thinker-note:hover {
 	background: var(--tk-fill);
 }
 
 /* The selected row is a tint, not a box. An outline around a row reads as a second
    container inside the list, and the first row is selected whenever the panel opens,
    so that box used to sit at the top of an otherwise empty column. */
-.thinker-note.is-selected {
+.view-content.thinker-home .thinker-note.is-selected {
 	background: var(--tk-fill);
 }
 
-.thinker-note.is-pinned::before {
+.view-content.thinker-home .thinker-note.is-pinned::before {
 	content: "";
 	position: absolute;
 	left: 0;
@@ -453,14 +570,14 @@ body {
 	background: var(--text-faint);
 }
 
-.thinker-note-main {
+.view-content.thinker-home .thinker-note-main {
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
 	min-width: 0;
 }
 
-.thinker-note-title {
+.view-content.thinker-home .thinker-note-title {
 	font-size: var(--tk-fs-md);
 	line-height: 1.4;
 	color: var(--text-normal);
@@ -469,7 +586,7 @@ body {
 	text-overflow: ellipsis;
 }
 
-.thinker-note-meta {
+.view-content.thinker-home .thinker-note-meta {
 	font-size: var(--tk-fs-xs);
 	line-height: 1.4;
 	color: var(--text-muted);
@@ -478,7 +595,7 @@ body {
 	text-overflow: ellipsis;
 }
 
-.thinker-note-when {
+.view-content.thinker-home .thinker-note-when {
 	margin-left: auto;
 	flex: 0 0 auto;
 	font-size: var(--tk-fs-xs);
@@ -488,7 +605,7 @@ body {
 
 /* The footer is a bar, so it sits on the same baseline as the side column's last
    card: both columns end together instead of the left one stopping mid-page. */
-.thinker-foot {
+.view-content.thinker-home .thinker-foot {
 	flex: 0 0 auto;
 	display: flex;
 	align-items: center;
@@ -497,7 +614,7 @@ body {
 	border-top: 0.5px solid var(--tk-hair);
 }
 
-.thinker-new {
+.view-content.thinker-home .thinker-new {
 	padding: 0;
 	border: none;
 	background: none;
@@ -512,40 +629,30 @@ body {
 	transition: color var(--tk-dur) var(--tk-ease);
 }
 
-.thinker-new:hover {
+.view-content.thinker-home .thinker-new:hover {
 	color: var(--text-normal);
 }
 
 /* The pencil is the row's switch, so it carries an icon instead of a glyph. Both
    buttons share one line box so the icon's baseline sits where the plus does. */
-.thinker-edit {
+.view-content.thinker-home .thinker-edit {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	height: 1em;
 }
 
-.thinker-edit svg {
+.view-content.thinker-home .thinker-edit svg {
 	width: 11px;
 	height: 11px;
 }
 
-.thinker-edit.is-on {
+.view-content.thinker-home .thinker-edit.is-on {
 	color: var(--text-normal);
 	box-shadow: inset 0 -2px 0 var(--text-muted);
 }
 
-.thinker-grid.is-swapped .thinker-foot-hint {
-	margin-left: auto;
-}
-
-.thinker-foot-hint {
-	font-size: var(--tk-fs-xs);
-	color: var(--text-faint);
-	white-space: nowrap;
-}
-
-.thinker-empty {
+.view-content.thinker-home .thinker-empty {
 	padding: var(--tk-6) var(--tk-3);
 	text-align: center;
 	font-size: var(--tk-fs-sm);
@@ -553,71 +660,78 @@ body {
 	color: var(--text-faint);
 }
 
-/* ---------- the timer ---------- */
+/* ---------- the timer ----------
 
-.thinker-timer {
+   The page has one hero. It is this, because it is the only thing here that starts
+   something. The big number is the current session; the thick arc is the day
+   against its goal, which is the only ratio that means the same thing in both
+   modes. Pomodoro adds a second, thinner arc for the round it is counting down,
+   because a countdown needs a denominator the stopwatch does not have. */
+
+.view-content.thinker-home .thinker-timer {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	gap: var(--tk-2);
 }
 
-.thinker-phase {
+.view-content.thinker-home .thinker-phase {
 	padding: 0;
 	border: none;
 	background: none;
 	box-shadow: none;
 	font-family: inherit;
 	font-size: var(--tk-fs-xs);
-	font-weight: var(--font-medium);
+	font-weight: var(--font-medium, 500);
 	letter-spacing: 0.08em;
 	color: var(--text-faint);
 	cursor: default;
 	transition: color var(--tk-dur) var(--tk-ease);
 }
 
-.thinker-phase.is-switch {
+.view-content.thinker-home .thinker-phase.is-switch {
 	cursor: pointer;
 }
 
-.thinker-phase.is-switch:hover {
+.view-content.thinker-home .thinker-phase.is-switch:hover {
 	color: var(--tk-accent);
 }
 
-.thinker-gauge {
+.view-content.thinker-home .thinker-gauge {
 	position: relative;
-	width: 148px;
-	height: 148px;
-	margin: var(--tk-3) 0;
+	width: 196px;
+	height: 196px;
+	margin: var(--tk-1) 0 var(--tk-2);
 }
 
-.thinker-ring {
+.view-content.thinker-home .thinker-ring {
 	display: block;
 	width: 100%;
 	height: 100%;
 }
 
-.thinker-ring-track {
+.view-content.thinker-home .thinker-ring-track {
 	fill: none;
-	stroke: color-mix(in srgb, var(--text-faint) 26%, transparent);
-	stroke-width: 3.5;
+	stroke: var(--tk-track);
+	stroke-width: var(--tk-arc);
 }
 
-.thinker-ring-arc {
+.view-content.thinker-home .thinker-ring-arc {
 	fill: none;
 	stroke: var(--tk-accent);
-	stroke-width: 3.5;
+	stroke-width: var(--tk-arc);
 	stroke-linecap: round;
-	transition: stroke-dashoffset 0.45s linear, stroke 200ms ease;
+	transition: stroke-dashoffset var(--tk-dur-slow) linear, stroke var(--tk-dur-slow) var(--tk-ease);
 }
 
-.thinker-time {
+.view-content.thinker-home .thinker-time {
 	position: absolute;
 	inset: 0;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: 50%;
-	font-size: var(--tk-fs-lg);
+	font-size: var(--tk-fs-digits);
 	font-variant-numeric: tabular-nums;
 	font-feature-settings: "tnum" 1;
 	letter-spacing: -0.01em;
@@ -627,40 +741,42 @@ body {
 	transition: color var(--tk-dur) var(--tk-ease);
 }
 
-.thinker-time:hover,
-.thinker-time:focus-visible {
+.view-content.thinker-home .thinker-time:hover,
+.view-content.thinker-home .thinker-time:focus-visible {
 	color: var(--tk-accent);
 }
 
 /* A paused session is dimmed rather than relabelled: same digits, less presence. */
-.thinker-timer-box[data-state="paused"] .thinker-time {
+.view-content.thinker-home .thinker-timer-box[data-state="paused"] .thinker-time {
 	color: var(--text-faint);
 }
 
-.thinker-timer-box[data-state="paused"] .thinker-ring-arc {
+.view-content.thinker-home .thinker-timer-box[data-state="paused"] .thinker-ring-arc {
 	stroke: var(--text-faint);
 }
 
 /* A break is a different activity, so the ring changes hue instead of the text
    changing size. Everything else stays put. */
-.thinker-timer-box[data-phase="shortBreak"] .thinker-ring-arc,
-.thinker-timer-box[data-phase="longBreak"] .thinker-ring-arc {
+.view-content.thinker-home .thinker-timer-box[data-phase="shortBreak"] .thinker-ring-arc,
+.view-content.thinker-home .thinker-timer-box[data-phase="longBreak"] .thinker-ring-arc {
 	stroke: var(--color-cyan, #22b8cf);
 }
 
-.thinker-timer-actions {
+/* Two words under the dial, and only while a session is running: nothing to
+   pause or end when nothing is. */
+.view-content.thinker-home .thinker-timer-actions {
 	display: flex;
+	align-items: center;
 	gap: var(--tk-4);
-	height: 18px;
-	margin-bottom: var(--tk-2);
+	margin-bottom: var(--tk-1);
 }
 
-.thinker-timer-actions.is-hidden {
+.view-content.thinker-home .thinker-timer-actions.is-off {
 	visibility: hidden;
 }
 
-.thinker-mini {
-	padding: 0;
+.view-content.thinker-home .thinker-mini {
+	padding: 0 var(--tk-1);
 	border: none;
 	background: none;
 	box-shadow: none;
@@ -671,32 +787,25 @@ body {
 	transition: color var(--tk-dur) var(--tk-ease);
 }
 
-.thinker-mini:hover {
+.view-content.thinker-home .thinker-mini:hover {
 	color: var(--tk-accent);
-}
-
-.thinker-timer-foot {
-	font-size: var(--tk-fs-xs);
-	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	text-align: center;
 }
 
 /* ---------- the calendar ---------- */
 
-.thinker-cal-nav {
+.view-content.thinker-home .thinker-cal-nav {
 	display: flex;
 	align-items: center;
 	gap: var(--tk-1);
 	margin-bottom: var(--tk-2);
 }
 
-.thinker-cal-btn {
+.view-content.thinker-home .thinker-cal-btn {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 24px;
-	height: 24px;
+	width: var(--tk-target);
+	height: var(--tk-target);
 	padding: 0;
 	border: none;
 	border-radius: var(--tk-r-sm);
@@ -710,11 +819,12 @@ body {
 	transition: color var(--tk-dur) var(--tk-ease), background-color var(--tk-dur) var(--tk-ease);
 }
 
-.thinker-cal-btn:hover {
-	color: var(--tk-accent);
+.view-content.thinker-home .thinker-cal-btn:hover {
+	color: var(--text-normal);
+	background: var(--tk-fill);
 }
 
-.thinker-cal-label {
+.view-content.thinker-home .thinker-cal-label {
 	flex: 1 1 auto;
 	text-align: center;
 	font-size: var(--tk-fs-sm);
@@ -722,34 +832,34 @@ body {
 	font-variant-numeric: tabular-nums;
 }
 
-.thinker-cal-weekdays,
-.thinker-cal-grid {
+.view-content.thinker-home .thinker-cal-weekdays,
+.view-content.thinker-home .thinker-cal-grid {
 	display: grid;
 	grid-template-columns: repeat(7, 1fr);
 	gap: 2px;
 }
 
-.thinker-cal-weekdays {
+.view-content.thinker-home .thinker-cal-weekdays {
 	margin-bottom: var(--tk-1);
 }
 
-.thinker-cal-weekday {
+.view-content.thinker-home .thinker-cal-weekday {
 	text-align: center;
 	font-size: var(--tk-fs-xs);
 	color: var(--text-faint);
 }
 
-.thinker-cal-grid {
+.view-content.thinker-home .thinker-cal-grid {
 	grid-auto-rows: 1fr;
 	height: clamp(180px, 20cqw, 300px);
 }
 
-.thinker-day {
+.view-content.thinker-home .thinker-day {
 	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	min-height: 26px;
+	min-height: var(--tk-target);
 	border-radius: var(--tk-r-sm);
 	font-size: var(--tk-fs-xs);
 	color: var(--text-muted);
@@ -759,23 +869,19 @@ body {
 }
 
 /* Hover only recolours; it never paints a second box on top of a heat cell. */
-.thinker-day:hover {
+.view-content.thinker-home .thinker-day:hover {
 	color: var(--text-normal);
 }
 
-.thinker-day.is-blank {
+.view-content.thinker-home .thinker-day.is-blank {
 	cursor: default;
 }
 
 /* Today is a brightness, not a box. A ring around one cell pulls the eye to the
    corner of a grid that is meant to be read as a whole, and the calendar already
    answers "how much" with its four greys; the day itself only has to be findable. */
-.thinker-day.is-today {
+.view-content.thinker-home .thinker-day.is-today {
 	color: var(--text-normal);
-}
-
-.thinker-day-dot {
-	display: none;
 }
 
 /* Heat is a gradient of one grey, and it is never the only signal: every cell
@@ -784,25 +890,24 @@ body {
    colour sitting next to the notes. The statistics panel keeps its accent version
    further down: there the bars and the heat are the only thing on screen, and a
    page of grey bars says less than a page of coloured ones. */
-.thinker-heat-1 {
-	background: color-mix(in srgb, var(--text-faint) 13%, transparent);
+.view-content.thinker-home .thinker-heat-1 {
+	background: var(--tk-heat-1);
 }
 
-.thinker-heat-2 {
-	background: color-mix(in srgb, var(--text-faint) 24%, transparent);
+.view-content.thinker-home .thinker-heat-2 {
+	background: var(--tk-heat-2);
 	color: var(--text-normal);
 }
 
-.thinker-heat-3 {
-	background: color-mix(in srgb, var(--text-faint) 37%, transparent);
+.view-content.thinker-home .thinker-heat-3 {
+	background: var(--tk-heat-3);
 	color: var(--text-normal);
 }
 
-.thinker-heat-4 {
-	background: color-mix(in srgb, var(--text-faint) 52%, transparent);
+.view-content.thinker-home .thinker-heat-4 {
+	background: var(--tk-heat-4);
 	color: var(--text-normal);
 }
-
 /* ---------- icon buttons ---------- */
 
 .thinker-icon-btn {
@@ -842,6 +947,12 @@ body {
 	outline: 1.5px solid var(--tk-accent);
 	outline-offset: 2px;
 	border-radius: var(--tk-r-sm);
+}
+
+/* Put on a workspace split for the one frame in which startup collapses the left
+   sidebar, so the page does not open with a sidebar sliding shut. */
+.workspace-split.is-no-transition {
+	transition: none !important;
 }
 
 /* ---------- modals ---------- */
@@ -1072,8 +1183,8 @@ body {
 
 .thinker-unit-tab.is-on {
 	color: var(--tk-accent);
-	border-color: color-mix(in srgb, var(--tk-accent) 55%, transparent);
-	background: color-mix(in srgb, var(--tk-accent) 10%, transparent);
+	border-color: var(--tk-accent-edge);
+	background: var(--tk-soft);
 }
 
 /* The period itself is the "back to today" control: no extra button for it. */
@@ -1182,10 +1293,10 @@ body {
 .thinker-bar {
 	width: 100%;
 	max-width: 16px;
-	height: var(--thinker-bar, 0%);
+	height: var(--tk-bar-h, 0%);
 	min-height: 2px;
-	border-radius: 3px 3px 1px 1px;
-	background: color-mix(in srgb, var(--tk-accent) 52%, transparent);
+	border-radius: var(--tk-1) var(--tk-1) 1px 1px;
+	background: var(--tk-bar);
 	transition: background-color var(--tk-dur) var(--tk-ease);
 }
 
@@ -1215,7 +1326,7 @@ body {
 	position: relative;
 	height: 22px;
 	border-radius: var(--tk-r-sm);
-	background: color-mix(in srgb, var(--text-faint) 10%, transparent);
+	background: var(--tk-tint);
 	overflow: hidden;
 }
 
@@ -1229,11 +1340,11 @@ body {
 	width: var(--tk-width, 1%);
 	min-width: 2px;
 	border-radius: 2px;
-	background: color-mix(in srgb, var(--tk-accent) 68%, transparent);
+	background: var(--tk-seg);
 }
 
 .thinker-seg.is-rest {
-	background: color-mix(in srgb, var(--color-cyan, #22b8cf) 42%, transparent);
+	background: var(--tk-rest-seg);
 }
 
 .thinker-day-scale {
@@ -1298,19 +1409,19 @@ body {
 /* The statistics panel reads in the accent: it is a page of charts with no words
    around them, so the heat here is the colour version of the same four steps. */
 .thinker-mcell.thinker-heat-1 {
-	background: color-mix(in srgb, var(--tk-accent) 14%, transparent);
+	background: var(--tk-aheat-1);
 }
 
 .thinker-mcell.thinker-heat-2 {
-	background: color-mix(in srgb, var(--tk-accent) 26%, transparent);
+	background: var(--tk-aheat-2);
 }
 
 .thinker-mcell.thinker-heat-3 {
-	background: color-mix(in srgb, var(--tk-accent) 40%, transparent);
+	background: var(--tk-aheat-3);
 }
 
 .thinker-mcell.thinker-heat-4 {
-	background: color-mix(in srgb, var(--tk-accent) 56%, transparent);
+	background: var(--tk-aheat-4);
 }
 
 /* ---------- what the time was spent on ---------- */
@@ -1342,12 +1453,12 @@ body {
 	top: 0;
 	bottom: 0;
 	width: var(--tk-share, 0%);
-	border-radius: 5px;
-	background: color-mix(in srgb, var(--tk-accent) 13%, transparent);
+	border-radius: var(--tk-r-sm);
+	background: var(--tk-soft);
 }
 
 .thinker-tag-row.is-rest .thinker-tag-fill {
-	background: color-mix(in srgb, var(--color-cyan, #22b8cf) 11%, transparent);
+	background: var(--tk-rest-soft);
 }
 
 .thinker-tag-name {
@@ -1378,15 +1489,15 @@ body {
 		overflow-y: auto;
 	}
 
-	.thinker-page {
+	.view-content.thinker-home .thinker-page {
 		height: auto;
 		min-height: 100%;
 		flex: 0 0 auto;
 		gap: var(--tk-4);
 	}
 
-	.thinker-grid,
-	.thinker-grid.is-swapped {
+	.view-content.thinker-home .thinker-grid,
+	.view-content.thinker-home .thinker-grid.is-swapped {
 		grid-template-columns: minmax(0, 1fr);
 		grid-template-areas: "notes" "aside";
 		max-height: none;
@@ -1394,38 +1505,34 @@ body {
 		gap: var(--tk-4);
 	}
 
-	.thinker-aside {
+	.view-content.thinker-home .thinker-aside {
 		flex-direction: row;
 		align-items: flex-start;
 		gap: var(--tk-4);
 		overflow-y: visible;
 	}
 
-	.thinker-aside > * {
+	.view-content.thinker-home .thinker-aside > * {
 		flex: 1 1 0;
 		min-width: 0;
 	}
 
-	.thinker-notes {
+	.view-content.thinker-home .thinker-notes {
 		min-height: 300px;
 	}
 
-	.thinker-time-lg {
-		font-size: 34px;
-	}
-
-	.thinker-gauge {
-		width: 124px;
-		height: 124px;
+	.view-content.thinker-home .thinker-gauge {
+		width: 160px;
+		height: 160px;
 	}
 }
 
 @container (max-width: 480px) {
-	.thinker-aside {
+	.view-content.thinker-home .thinker-aside {
 		flex-direction: column;
 	}
 
-	.thinker-clockbar {
+	.view-content.thinker-home .thinker-statusbar {
 		flex-wrap: wrap;
 		row-gap: var(--tk-1);
 	}
@@ -1436,53 +1543,28 @@ body {
 }
 
 /* Reduced motion is a token change, not an override: every duration in this sheet
-   reads --tk-dur, so one declaration covers all of them. The ring is the one
-   animation that carries its own duration. */
+   reads one of the three duration tokens, so two declarations cover all of them.
+   They have to be written on both :root and body, because that is where the
+   durations are declared: a query that only touches :root leaves every element in
+   the page inheriting the body's 130ms and changes nothing. */
 @media (prefers-reduced-motion: reduce) {
-	:root {
+	:root,
+	body {
+		--tk-dur-fast: 1ms;
 		--tk-dur: 1ms;
+		--tk-dur-slow: 1ms;
 	}
-
-	.view-content.thinker-home .thinker-ring-arc {
-		transition-duration: 1ms;
-	}
-}
-
-/* Every pressable label warms to the accent at the same tempo, so hovering feels
-   like one behaviour rather than five. */
-.thinker-chip,
-.thinker-new,
-.thinker-mini,
-.thinker-phase.is-switch,
-.thinker-cal-btn,
-.thinker-day-btn,
-.thinker-unit-tab,
-.thinker-icon-btn,
-.thinker-stats-range {
-	transition: color var(--tk-dur) cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 /* ---------- hover, in one place ----------
 
-   Every pressable label warms to the same accent at the same tempo, except inside the
-   notes panel and on the start page's calendar, which carry no accent at all and only
-   darken to the reading colour. Declared last so it settles ties with the per-component
-   rules above. */
+   The start page settles its own hover colours next to each component, one class
+   deeper than the button reset. What is left here is the two panels that live
+   outside the view — modals and the statistics sidebar — which have no reset to
+   outrank and can share one list. */
 
-.thinker-notes .thinker-chip:hover,
-.thinker-notes .thinker-new:hover,
-.thinker-notes .thinker-note:hover .thinker-note-title,
-.thinker-cal .thinker-cal-btn:hover {
-	color: var(--text-normal);
-}
-
-.thinker-timer .thinker-time:hover,
-.thinker-timer .thinker-mini:hover,
-.thinker-timer .thinker-phase.is-switch:hover,
 .thinker-modal .thinker-day-btn:hover,
 .thinker-modal .thinker-create-kind:hover,
-.thinker-modal .thinker-day-add:hover,
-.thinker-modal .thinker-day-diary:hover,
 .thinker-modal .setting-item-control button:hover,
 .thinker-stats .thinker-unit-tab:hover,
 .thinker-stats .thinker-stats-range:hover,
@@ -1490,10 +1572,12 @@ body {
 	color: var(--tk-accent);
 }
 
-.thinker-notes .thinker-note-title,
+/* The two colour transitions that were being overwritten by an aggregated block
+   further up. Declared here, on the elements that own them, so a component that
+   animates two properties keeps both. */
 .thinker-stats .thinker-unit-tab,
 .thinker-stats .thinker-stats-label {
-	transition: color var(--tk-dur) cubic-bezier(0.2, 0.7, 0.3, 1);
+	transition: color var(--tk-dur) var(--tk-ease);
 }
 
 /* The plus is a member of the range row, but it is not a range: it keeps a
@@ -1635,11 +1719,11 @@ body {
    a level-2 row is muted by design, so a tinted background read as a hover state
    rather than as the current choice. Four classes, so no level rule can win. */
 .thinker-modal .thinker-pick-row.is-on {
-	background: color-mix(in srgb, var(--tk-accent) 8%, transparent);
+	background: var(--tk-soft);
 }
 
 /* Five classes deep: a theme that styles rows inside a modal cannot outrank this,
-   and the inline colour the dialog sets covers the rest. */
+   so the colour of the chosen place is set here rather than on the element. */
 .thinker-modal .thinker-pick .thinker-pick-row.is-on .thinker-pick-name {
 	color: var(--tk-accent);
 	font-weight: var(--font-medium, 500);
