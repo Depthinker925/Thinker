@@ -100,6 +100,13 @@ rest-count: 3
 | `open-stats` | Open focus statistics |
 
 ### Changelog
+#### 3.4.1
+
+The day grid is square. Every cell takes the same gutter on both axes, and the month height now comes from its width through the ratio 7/6, so the cells stay square at any column width instead of stretching into tall rectangles.
+
+The heat scale is anchored to the daily goal rather than to the busiest day of the month. Reaching the goal is the last step, and a day past it keeps that step; before, one long day pushed every other cell down to the palest one. Empty days keep the frame and the faintest fill, so a short session stays visible against a day with nothing in it.
+
+The stylesheet no longer carries a forced declaration. The two places that had to outrank the app or a theme now do it by selector weight: the startup rule that keeps the left sidebar out of the first frame, and the one that drops the sidebar transition for that collapse.
 
 #### 3.4.0
 
@@ -199,7 +206,13 @@ rest-count: 3
 | `open-stats` | 打开专注统计 |
 
 ### 更新日志
+#### 3.4.1
 
+日格改成正方形。横竖各留同一个间隙，月视图的高度由宽度按 7 比 6 推出，列一窄格子仍然是方的，不再被拉成长方形。
+
+热力以每日目标为顶，不再拿当月最长的一天当分母。到目标就是最后一档，超过仍停在这一档；在这之前，只要有一天很长，其余格子全被压到最浅一档。没有记录的日子留着框和最淡的一层底色，半小时的日子才不会被读成空白。
+
+样式表里不再有强制声明。需要压过应用与主题的两处改成靠选择器权重取胜：启动时把左侧栏挡在第一帧之外的那条，以及收起时去掉侧栏过渡的那条。
 #### 3.4.0
 
 起始页重做一遍，数据、命令、设置都不变。

@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.4.0 · status line, day ring, week strip";
+const BUILD = "3.4.1 · day grid, square cells";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -3793,7 +3793,7 @@ class ThinkerPlugin extends Plugin {
      setting exists to prevent.
 
      Both the class and the inline style are set there. The class is what a
-     stylesheet says and carries !important, so it outranks a theme that restates
+     stylesheet says, and it is written deep enough to outrank a theme that restates
      the transition; the inline style is the same switch 3.3.2 used and does not
      depend on Obsidian having decorated this element with addClass. It is restored
      on a timer, not on the next frame: a frame can be delivered before the layout

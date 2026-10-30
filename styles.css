@@ -126,10 +126,16 @@ body {
    has already been drawn: the sidebar has to be out of the picture from the moment
    the plugin loads. The plugin puts this class on body as soon as it has read its
    settings and takes it off once the collapse has settled, so the rule covers the
-   whole startup window and nothing after it. */
-body.is-thinker-booting .workspace-split.mod-left-split,
-body.is-thinker-booting .workspace-ribbon.side-dock-ribbon.mod-left {
-	display: none !important;
+   whole startup window and nothing after it.
+
+   Five levels deep on purpose, so the declaration wins on specificity rather than
+   on a forced flag: `body` plus four classes outranks both the app's
+   `.workspace-split.mod-left-split` and a theme that restates it. Descendant rather
+   than child combinators: the split and the ribbon have moved between the workspace
+   and its left pane across versions, and the rule has to catch both. */
+body.is-thinker-booting .workspace .workspace-split.mod-left-split,
+body.is-thinker-booting .workspace .workspace-ribbon.side-dock-ribbon.mod-left {
+	display: none;
 }
 
 .view-content.thinker-home {
@@ -957,9 +963,12 @@ body.is-thinker-booting .workspace-ribbon.side-dock-ribbon.mod-left {
 }
 
 /* Put on a workspace split for the one frame in which startup collapses the left
-   sidebar, so the page does not open with a sidebar sliding shut. */
-.workspace-split.is-no-transition {
-	transition: none !important;
+   sidebar, so the page does not open with a sidebar sliding shut. Two classes give
+   it the weight to beat the transition a theme declares on `.workspace-split`, with
+   no forced declaration; the inline style the plugin sets at the same moment is the
+   second lock, and it outranks everything by position. */
+.workspace .workspace-split.is-no-transition {
+	transition: none;
 }
 
 /* ---------- modals ---------- */
