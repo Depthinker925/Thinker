@@ -91,6 +91,10 @@ rest-count: 3
 | `open-stats` | Open focus statistics |
 
 ### Changelog
+#### 3.4.2
+
+Upload README.md
+
 #### 3.4.1
 
 The day grid is square. Every cell takes the same gutter on both axes, and the month height now comes from its width through the ratio 7/6, so the cells stay square at any column width instead of stretching into tall rectangles.
@@ -197,6 +201,9 @@ rest-count: 3
 | `open-stats` | 打开专注统计 |
 
 ### 更新日志
+#### 3.4.2
+
+更新README.md
 #### 3.4.1
 
 日格改成正方形。横竖各留同一个间隙，月视图的高度由宽度按 7 比 6 推出，列一窄格子仍然是方的，不再被拉成长方形。
