@@ -91,9 +91,13 @@ rest-count: 3
 | `open-stats` | Open focus statistics |
 
 ### Changelog
+#### 3.4.3
+
+The manifest published with 3.4.2 differed from the one in this repository. Version strings are aligned; no other change.
+
 #### 3.4.2
 
-Upload README.md
+Readme rewritten: the metadata table removed, two donation codes added. The plugin is the same as 3.4.1.
 
 #### 3.4.1
 
@@ -201,9 +205,14 @@ rest-count: 3
 | `open-stats` | 打开专注统计 |
 
 ### 更新日志
+#### 3.4.3
+
+3.4.2 附带的 manifest 与仓库中的文件不一致。本版对齐版本号，其余未改动。
+
 #### 3.4.2
 
-更新README.md
+README 重写：删除顶部元信息表，加入两个收款码。插件与 3.4.1 相同。
+
 #### 3.4.1
 
 日格改成正方形。横竖各留同一个间隙，月视图的高度由宽度按 7 比 6 推出，列一窄格子仍然是方的，不再被拉成长方形。
