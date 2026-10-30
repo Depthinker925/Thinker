@@ -63,10 +63,17 @@ body {
 	   second colour. */
 	--tk-track: color-mix(in srgb, var(--text-faint) 24%, transparent);
 	--tk-tint: color-mix(in srgb, var(--text-faint) 10%, transparent);
-	--tk-heat-1: color-mix(in srgb, var(--text-faint) 13%, transparent);
-	--tk-heat-2: color-mix(in srgb, var(--text-faint) 24%, transparent);
-	--tk-heat-3: color-mix(in srgb, var(--text-faint) 37%, transparent);
-	--tk-heat-4: color-mix(in srgb, var(--text-faint) 52%, transparent);
+	/* The empty box is a hair of a fill, not a mid grey: the first step above it has
+	   to be visible, or a day with twenty minutes in it looks like a day with
+	   nothing. The four steps climb from there to the daily goal, which is the last
+	   one: a day that reaches the goal is the strongest fill, and so is any day past
+	   it. In a dark theme the strongest is the lightest cell; in a light theme the
+	   same token gives the darkest one, because it is one grey at four opacities. */
+	--tk-cell: color-mix(in srgb, var(--text-faint) 8%, transparent);
+	--tk-heat-1: color-mix(in srgb, var(--text-faint) 20%, transparent);
+	--tk-heat-2: color-mix(in srgb, var(--text-faint) 32%, transparent);
+	--tk-heat-3: color-mix(in srgb, var(--text-faint) 44%, transparent);
+	--tk-heat-4: color-mix(in srgb, var(--text-faint) 58%, transparent);
 	--tk-aheat-1: color-mix(in srgb, var(--tk-accent) 14%, transparent);
 	--tk-aheat-2: color-mix(in srgb, var(--tk-accent) 26%, transparent);
 	--tk-aheat-3: color-mix(in srgb, var(--tk-accent) 40%, transparent);
@@ -93,10 +100,11 @@ body {
 	body {
 		--tk-track: rgba(128, 128, 128, 0.26);
 		--tk-tint: rgba(128, 128, 128, 0.1);
-		--tk-heat-1: rgba(128, 128, 128, 0.13);
-		--tk-heat-2: rgba(128, 128, 128, 0.24);
-		--tk-heat-3: rgba(128, 128, 128, 0.37);
-		--tk-heat-4: rgba(128, 128, 128, 0.52);
+		--tk-cell: rgba(128, 128, 128, 0.08);
+		--tk-heat-1: rgba(128, 128, 128, 0.2);
+		--tk-heat-2: rgba(128, 128, 128, 0.32);
+		--tk-heat-3: rgba(128, 128, 128, 0.44);
+		--tk-heat-4: rgba(128, 128, 128, 0.58);
 		--tk-aheat-1: rgba(128, 128, 128, 0.16);
 		--tk-aheat-2: rgba(128, 128, 128, 0.3);
 		--tk-aheat-3: rgba(128, 128, 128, 0.44);
@@ -109,6 +117,19 @@ body {
 		--tk-rest-soft: rgba(34, 184, 207, 0.12);
 		--tk-rest-seg: rgba(34, 184, 207, 0.42);
 	}
+}
+
+/* ---------- startup ----------
+
+   The window paints the restored layout before onLayoutReady fires, so a collapse
+   done there is always one frame late. No transition trick takes back a frame that
+   has already been drawn: the sidebar has to be out of the picture from the moment
+   the plugin loads. The plugin puts this class on body as soon as it has read its
+   settings and takes it off once the collapse has settled, so the rule covers the
+   whole startup window and nothing after it. */
+body.is-thinker-booting .workspace-split.mod-left-split,
+body.is-thinker-booting .workspace-ribbon.side-dock-ribbon.mod-left {
+	display: none !important;
 }
 
 .view-content.thinker-home {
@@ -246,13 +267,13 @@ body {
 	flex: 1 1 auto;
 	min-height: 0;
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) clamp(320px, 26%, 380px);
+	grid-template-columns: minmax(0, 1fr) clamp(282px, 22%, 320px);
 	grid-template-areas: "notes aside";
 	gap: var(--tk-6);
 }
 
 .view-content.thinker-home .thinker-grid.is-swapped {
-	grid-template-columns: clamp(320px, 26%, 380px) minmax(0, 1fr);
+	grid-template-columns: clamp(282px, 22%, 320px) minmax(0, 1fr);
 	grid-template-areas: "aside notes";
 }
 
@@ -271,7 +292,7 @@ body {
 	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	justify-content: flex-start;
+	justify-content: space-between;
 	gap: var(--tk-4);
 	overflow-y: auto;
 	scrollbar-width: thin;
@@ -284,6 +305,20 @@ body {
 	border-radius: var(--tk-r-lg);
 	padding: var(--tk-4);
 	flex: 0 0 auto;
+}
+
+/* The timer panel is handed the card element itself, so this class and
+   .thinker-timer land on one node: anything set here has to survive the
+   .thinker-timer rule further down, which is why flex lives only here. The card
+   takes the height the calendar leaves — that is what puts its bottom edge on the
+   line the notes column ends on — with a floor so a short window scrolls the
+   column instead of squeezing the dial. */
+.view-content.thinker-home .thinker-timer-box {
+	flex: 1 1 auto;
+	/* The floor is what stops a short window from squeezing the card under the
+	   dial: below it the column scrolls instead. */
+	min-height: min-content;
+	display: flex;
 }
 
 /* ---------- notes ---------- */
@@ -603,55 +638,6 @@ body {
 	font-variant-numeric: tabular-nums;
 }
 
-/* The footer is a bar, so it sits on the same baseline as the side column's last
-   card: both columns end together instead of the left one stopping mid-page. */
-.view-content.thinker-home .thinker-foot {
-	flex: 0 0 auto;
-	display: flex;
-	align-items: center;
-	gap: var(--tk-3);
-	padding-top: var(--tk-3);
-	border-top: 0.5px solid var(--tk-hair);
-}
-
-.view-content.thinker-home .thinker-new {
-	padding: 0;
-	border: none;
-	background: none;
-	box-shadow: none;
-	font-family: inherit;
-	/* Same size as the keyboard hint beside it: the plus is a footnote, not an
-	   action competing with the list. */
-	font-size: var(--tk-fs-xs);
-	line-height: 1;
-	color: var(--text-muted);
-	cursor: pointer;
-	transition: color var(--tk-dur) var(--tk-ease);
-}
-
-.view-content.thinker-home .thinker-new:hover {
-	color: var(--text-normal);
-}
-
-/* The pencil is the row's switch, so it carries an icon instead of a glyph. Both
-   buttons share one line box so the icon's baseline sits where the plus does. */
-.view-content.thinker-home .thinker-edit {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	height: 1em;
-}
-
-.view-content.thinker-home .thinker-edit svg {
-	width: 11px;
-	height: 11px;
-}
-
-.view-content.thinker-home .thinker-edit.is-on {
-	color: var(--text-normal);
-	box-shadow: inset 0 -2px 0 var(--text-muted);
-}
-
 .view-content.thinker-home .thinker-empty {
 	padding: var(--tk-6) var(--tk-3);
 	text-align: center;
@@ -663,15 +649,18 @@ body {
 /* ---------- the timer ----------
 
    The page has one hero. It is this, because it is the only thing here that starts
-   something. The big number is the current session; the thick arc is the day
-   against its goal, which is the only ratio that means the same thing in both
-   modes. Pomodoro adds a second, thinner arc for the round it is counting down,
-   because a countdown needs a denominator the stopwatch does not have. */
+   something. The big number is the current session and the arc measures the same
+   session: a pomodoro counts its block down, a stopwatch laps once an hour. The
+   card takes the height the calendar leaves and the dial centres in it, so both
+   cards in this column end on the line the notes column ends on. */
 
 .view-content.thinker-home .thinker-timer {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	/* Centred in the card, so the extra height sits above and below the dial rather
+	   than all of it under the buttons. */
+	justify-content: center;
 	gap: var(--tk-2);
 }
 
@@ -699,8 +688,10 @@ body {
 
 .view-content.thinker-home .thinker-gauge {
 	position: relative;
-	width: 196px;
-	height: 196px;
+	flex: 0 0 auto;
+	width: 248px;
+	height: 248px;
+	max-width: 100%;
 	margin: var(--tk-1) 0 var(--tk-2);
 }
 
@@ -836,7 +827,9 @@ body {
 .view-content.thinker-home .thinker-cal-grid {
 	display: grid;
 	grid-template-columns: repeat(7, 1fr);
-	gap: 2px;
+	/* One gap for both axes, so the gutter between two cells is the same whether
+	   they sit side by side or one above the other. */
+	gap: var(--tk-1);
 }
 
 .view-content.thinker-home .thinker-cal-weekdays {
@@ -849,18 +842,28 @@ body {
 	color: var(--text-faint);
 }
 
+/* Six rows of seven squares, with the same gutter on both axes. The height comes
+   from the width through the ratio 7/6 rather than from a fixed number of pixels:
+   that is what keeps the cells square once the column gets narrower, and it moves
+   the calendar down in height when the window does. */
 .view-content.thinker-home .thinker-cal-grid {
 	grid-auto-rows: 1fr;
-	height: clamp(180px, 20cqw, 300px);
+	height: auto;
+	aspect-ratio: 7 / 6;
 }
 
+/* Every day is a box, filled or not. Without the frame the empty days of a month
+   with little in it are just numbers floating in a grid, and the calendar stops
+   reading as a calendar. The heat steps then paint inside the box. */
 .view-content.thinker-home .thinker-day {
 	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	min-height: var(--tk-target);
+	border: 0.5px solid var(--tk-hair);
 	border-radius: var(--tk-r-sm);
+	background: var(--tk-cell);
 	font-size: var(--tk-fs-xs);
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
@@ -875,12 +878,16 @@ body {
 
 .view-content.thinker-home .thinker-day.is-blank {
 	cursor: default;
+	border-color: transparent;
+	background: none;
 }
 
-/* Today is a brightness, not a box. A ring around one cell pulls the eye to the
+/* Today is a brightness, not a ring. A ring around one cell pulls the eye to the
    corner of a grid that is meant to be read as a whole, and the calendar already
-   answers "how much" with its four greys; the day itself only has to be findable. */
+   answers "how much" with its four greys; the day itself only has to be findable,
+   which is what the darker frame and the reading colour do. */
 .view-content.thinker-home .thinker-day.is-today {
+	border-color: var(--tk-outline);
 	color: var(--text-normal);
 }
 
@@ -890,21 +897,21 @@ body {
    colour sitting next to the notes. The statistics panel keeps its accent version
    further down: there the bars and the heat are the only thing on screen, and a
    page of grey bars says less than a page of coloured ones. */
-.view-content.thinker-home .thinker-heat-1 {
+.view-content.thinker-home .thinker-day.thinker-heat-1 {
 	background: var(--tk-heat-1);
 }
 
-.view-content.thinker-home .thinker-heat-2 {
+.view-content.thinker-home .thinker-day.thinker-heat-2 {
 	background: var(--tk-heat-2);
 	color: var(--text-normal);
 }
 
-.view-content.thinker-home .thinker-heat-3 {
+.view-content.thinker-home .thinker-day.thinker-heat-3 {
 	background: var(--tk-heat-3);
 	color: var(--text-normal);
 }
 
-.view-content.thinker-home .thinker-heat-4 {
+.view-content.thinker-home .thinker-day.thinker-heat-4 {
 	background: var(--tk-heat-4);
 	color: var(--text-normal);
 }
@@ -1507,7 +1514,10 @@ body {
 
 	.view-content.thinker-home .thinker-aside {
 		flex-direction: row;
-		align-items: flex-start;
+		/* Here the two cards sit side by side under the notes column, where the
+		   timer is the shorter of the two. Stretched, they read as one band
+		   instead of two blocks of different height. */
+		align-items: stretch;
 		gap: var(--tk-4);
 		overflow-y: visible;
 	}
@@ -1517,13 +1527,30 @@ body {
 		min-width: 0;
 	}
 
+	.view-content.thinker-home .thinker-cal {
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* The grid takes the height the timer card sets, so both cards end on the same
+	   line whatever the month costs. */
+	.view-content.thinker-home .thinker-cal-grid {
+		flex: 1 1 auto;
+		height: auto;
+		/* The ratio belongs to the side-by-side layout. Here the grid is stretched
+		   to the height the timer card took, so the cells grow instead. */
+		aspect-ratio: auto;
+		min-height: clamp(180px, 20cqw, 300px);
+	}
+
 	.view-content.thinker-home .thinker-notes {
 		min-height: 300px;
 	}
 
 	.view-content.thinker-home .thinker-gauge {
-		width: 160px;
-		height: 160px;
+		width: min(100%, 220px);
+		height: auto;
+		aspect-ratio: 1;
 	}
 }
 

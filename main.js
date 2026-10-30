@@ -1477,7 +1477,6 @@ class NotePanel {
     });
     this.input.addEventListener("keydown", (evt) => this.onKeyDown(evt));
 
-    const foot = root.createDiv({ cls: "thinker-foot" });
 
     this.refresh();
   }
@@ -2154,7 +2153,6 @@ class CalendarPanel {
     const cells = monthGrid(this.year, this.month, settings.weekStart);
     const today = todayKey();
     const goalSec = Math.max(1, settings.dailyGoalMinutes) * 60;
-    const maxSec = Math.max(goalSec, ...Array.from(this.monthData.values()).map((item) => item.focusSec || 0));
     for (const key of cells) {
       if (!key) {
         grid.createDiv({ cls: "thinker-day is-blank" });
@@ -2164,7 +2162,11 @@ class CalendarPanel {
       const day = grid.createEl("button", { cls: "thinker-day" });
       if (key === today) day.addClass("is-today");
       if (info && info.focusSec > 0) {
-        const level = Math.max(1, Math.min(4, Math.ceil((info.focusSec / maxSec) * 4)));
+        /* The daily goal is the top of the scale, not the busiest day of the month.
+           Anchored to the busiest day, one long session reset every other cell to
+           its palest step; anchored to the goal, a full day always looks like a
+           full day and anything past it keeps that strength. */
+        const level = Math.max(1, Math.min(4, Math.ceil((info.focusSec / goalSec) * 4)));
         day.addClass("thinker-heat-" + level);
         day.setAttribute("aria-label", t("cal.heat", { count: info.count }));
         day.setAttribute("title", key + " · " + formatDuration(info.focusSec));
@@ -2204,7 +2206,7 @@ class HomeView extends ItemView {
   }
 
   getIcon() {
-    return "home";
+    return "square-chart-gantt";
   }
 
   async onOpen() {
@@ -3685,6 +3687,13 @@ class ThinkerPlugin extends Plugin {
     initLocale();
     const data = await this.loadData();
     this.settings = readSettings(data && data.settings);
+    /* Out of the picture before the first paint, not after it: this is the earliest
+       moment the plugin has a say, and the class comes off once the collapse has
+       settled. */
+    if (this.settings.collapseLeftSidebar) {
+      this.hideLeftSplitForBoot();
+      this.register(() => this.releaseLeftSplit());
+    }
     this.storage = new DayStore(this.app, () => this.settings);
     this.index = new NoteIndex(
       this.app,
@@ -3698,7 +3707,7 @@ class ThinkerPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => rememberNoteLeaf(this.app)));
     this.addSettingTab(new ThinkerSettingTab(this.app, this));
     this.addCommands();
-    this.addRibbonIcon("home", t("ribbon.home"), () => void this.openHome(false));
+    this.addRibbonIcon("square-chart-gantt", t("ribbon.home"), () => void this.openHome(false));
     this.addRibbonIcon("bar-chart-2", t("ribbon.stats"), () => void this.openStats());
     this.addRibbonIcon("settings", t("ribbon.settings"), () => this.openSettings());
 
@@ -3774,36 +3783,73 @@ class ThinkerPlugin extends Plugin {
 
   /* The left sidebar is a file browser, and this page already lists the notes. On
      startup it is collapsed so the page starts wide; the ribbon stays one click
-     away when it is needed. */
-  collapseLeftSidebar() {
+     away when it is needed.
+
+     Two layers, because there are two ways to be seen. The boot class in
+     styles.css keeps the split out of the picture until the collapse has settled:
+     that is what covers the frames the window paints before this method is even
+     called. The transition suppression below covers the rest — collapsing with the
+     animation on reads as the drawer sliding shut, which is the one thing this
+     setting exists to prevent.
+
+     Both the class and the inline style are set there. The class is what a
+     stylesheet says and carries !important, so it outranks a theme that restates
+     the transition; the inline style is the same switch 3.3.2 used and does not
+     depend on Obsidian having decorated this element with addClass. It is restored
+     on a timer, not on the next frame: a frame can be delivered before the layout
+     change it is meant to cover, and that is how the flash came back once. */
+  collapseLeftSidebar(instant) {
     const split = this.app.workspace.leftSplit;
+    /* Whatever happens below, the boot class comes off on a timer: an early return
+       or an exception must not leave the sidebar hidden for the session. */
+    if (instant) window.setTimeout(() => this.releaseLeftSplit(), 600);
     if (!split || split.collapsed) return;
-    /* The transition is removed for this one collapse: on startup the sidebar is
-       otherwise seen sliding shut, which reads as a flicker. A class rather than an
-       inline style, because the plugin stylesheet is where the plugin says how
-       things look. */
     const el = split.containerEl;
-    if (el && el.addClass) el.addClass("is-no-transition");
+    const suppress = () => {
+      if (!el) return;
+      if (el.classList) el.classList.add("is-no-transition");
+      if (el.style) el.style.transition = "none";
+    };
+    const restore = () => {
+      if (!el) return;
+      if (el.classList) el.classList.remove("is-no-transition");
+      if (el.style) el.style.transition = "";
+    };
+    if (instant) suppress();
     try {
       split.collapse();
     } catch (error) {
       console.error("Thinker: could not collapse the left sidebar", error);
     }
-    if (el && el.removeClass) {
-      const restore = () => {
-        el.removeClass("is-no-transition");
-      };
-      if (window.requestAnimationFrame) window.requestAnimationFrame(restore);
-      else window.setTimeout(restore, 0);
-    }
+    /* 600ms is longer than the slowest sidebar animation a theme ships (Baseline
+       runs the moderate step, 320ms). A collapse done by hand from the settings
+       keeps its animation: only startup asks for instant. */
+    if (instant && el) window.setTimeout(restore, 600);
+  }
+
+  /* The window paints the restored layout before onLayoutReady fires, so a collapse
+     done there is always one frame late. Hiding the split for the length of startup
+     is the only thing that covers a frame already drawn; see the startup block in
+     styles.css. */
+  hideLeftSplitForBoot() {
+    const body = document.body;
+    if (body && body.classList) body.classList.add("is-thinker-booting");
+  }
+
+  releaseLeftSplit() {
+    const body = document.body;
+    if (body && body.classList) body.classList.remove("is-thinker-booting");
   }
 
   onReady() {
     this.ready = true;
+    /* Collapsed first, before the index and the first render: the work below takes
+       long enough to be a frame or three, and every one of them paints the sidebar
+       open. The setting is about not seeing it at all. */
+    if (this.settings.collapseLeftSidebar) this.collapseLeftSidebar(true);
     this.index.rebuild();
     this.refreshAll();
     this.registerVaultEvents();
-    if (this.settings.collapseLeftSidebar) this.collapseLeftSidebar();
     if (this.settings.openOnStartup) void this.openHome(true);
   }
 

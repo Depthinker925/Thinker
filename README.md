@@ -16,13 +16,13 @@ Obsidian 起始页插件：一个视图里放着时钟、笔记清单、专注�
 | Data folder / 数据目录 | `FocusLog` |
 
 ---
-## Buy me a Coffee  |  支持作者
-| 微信支付 WeChat | 支付宝 AliPay |
+
+## Buy me a coffee (optional)  |  支持作者（可选）
+| Alipay 支付宝 | WeChat Pay 微信 |
 | --- | --- |
-| ![WeChat](assets/WeChat.jpg) | ![Alipay](assets/Alipay.jpg) |
+| <img src="assets/AliPay.jpg" width="200" alt="Alipay QR code"> | <img src="assets/WeChat.jpg" width="200" alt="WeChat Pay QR code"> |
 
 ---
-
 ## English
 
 ### Install
@@ -57,7 +57,7 @@ A session ends with a chime. Vibration and system notices are switches of their 
 
 ### Calendar
 
-A month grid colours each day by focus time, in four steps. Opening a day lists its records one by one, and a session that was missed can be added by hand. The diary for that day opens from the same panel.
+A month grid draws every day as a square box and fills it by that day's focus, in four steps: the daily goal is the last step, and a day past the goal keeps it. Empty days keep the frame and the palest fill. Opening a day lists its records one by one, and a session that was missed can be added by hand. The diary for that day opens from the same panel.
 
 ### Statistics
 
@@ -115,9 +115,10 @@ The ring measures the session rather than the day. A day ring against a six hour
 
 Under the surface: the stylesheet was rebuilt on one token layer with a single fallback for `color-mix`, the button reset and the components that size themselves now sit on the same footing instead of one silently flattening the other, reduced motion reaches the tokens it claims to cover, and the aggregate transition block that was swallowing two-property transitions is gone.
 
+
 ### Compatibility
 
-`data.json` keeps the same shape as 3.3.1, so an in-place upgrade needs no migration. Records are read from the same `FocusLog` files. The plugin needs Obsidian 1.13.0 or newer and does not run on mobile.
+`data.json` keeps the same shape as 3.3.2, so an in-place upgrade needs no migration. Records are read from the same `FocusLog` files. The plugin needs Obsidian 1.13.0 or newer and does not run on mobile.
 
 ---
 
@@ -155,7 +156,7 @@ Thinker 只注册一个视图。它随 Obsidian 启动打开，打开时收起�
 
 ### 日历
 
-月历按天显示专注时长，分四档深浅。点开某一天看当天逐条记录，漏掉的会话可以手动补记，当天的日记也从这里打开。
+月历把每天画成一个方格，按当天专注时长分四档填色：每日目标就是最深的一档，超过目标仍停在这一档。没有记录的日子留着框和最淡的一层底色。点开某一天看当天逐条记录，漏掉的会话可以手动补记，当天的日记也从这里打开。
 
 ### 统计
 
@@ -213,7 +214,6 @@ rest-count: 3
 
 底层：样式表重建在一套令牌上，`color-mix` 只有一个后备分支；按钮重置与给出尺寸的组件现在站在一起，不再出现一个悄悄压平另一个；减弱动效终于改到它声称覆盖的令牌上；吞掉双属性过渡的聚合块已删除。
 
-
 ### 兼容
 
-`data.json` 的格式与 3.3.1 相同，原地升级不需要迁移；记录仍从原来的 `FocusLog` 文件读。插件要求 Obsidian 1.13.0 以上，不支持移动端。
+`data.json` 的格式与 3.3.2 相同，原地升级不需要迁移；记录仍从原来的 `FocusLog` 文件读。插件要求 Obsidian 1.13.0 以上，不支持移动端。
