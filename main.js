@@ -9,8 +9,8 @@
  *   1  i18n            2  date and text helpers      3  NoteIndex
  *   4  DayStore        5  TimerEngine + sound        6  NotePanel
  *   7  TimerPanel      8  CalendarPanel              9  HomeView
- *  10  Modals         11  SettingsTab
- *  13  Plugin
+ *  10  Modals         11  SettingsTab               12  Open a note
+ *  14  Plugin
  */
 
 const obsidian = require("obsidian");
@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.3.1 · range switches";
+const BUILD = "3.3.2 · note tab reuse";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -1783,8 +1783,7 @@ class NotePanel {
   openEntry(entry, newTab) {
     const file = entry.file || this.deps.app.vault.getAbstractFileByPath(entry.path);
     if (!file) return;
-    const leaf = newTab ? this.deps.app.workspace.getLeaf("tab") : this.deps.app.workspace.getLeaf(false);
-    void leaf.openFile(file);
+    void openNote(this.deps.app, file, { newTab: newTab === true });
   }
 
   openMenu(entry, evt) {
@@ -1867,7 +1866,7 @@ class NotePanel {
       const file = await app.vault.create(path, "");
       this.input.value = "";
       this.pendingQuery = "";
-      await app.workspace.getLeaf(false).openFile(file);
+      await openNote(app, file);
     } catch (e) {
       new Notice(String(e && e.message ? e.message : e));
     }
@@ -2265,7 +2264,7 @@ async function openDiary(app, config, dayKey) {
   const path = diaryPathFor(config, dayKey);
   const existing = app.vault.getAbstractFileByPath(path);
   if (existing) {
-    await app.workspace.getLeaf(false).openFile(existing);
+    await openNote(app, existing);
     return;
   }
   let body = "";
@@ -2294,7 +2293,7 @@ async function openDiary(app, config, dayKey) {
     }
   }
   const file = await app.vault.create(path, body);
-  await app.workspace.getLeaf(false).openFile(file);
+  await openNote(app, file);
 }
 
 /* --------------------------------------------------------------- 11  Modals */
@@ -2460,7 +2459,7 @@ class CreateModal extends Modal {
       const file = await app.vault.create(path, "");
       this.close();
       if (this.onDone) this.onDone({ kind: "note", path, file });
-      await app.workspace.getLeaf(false).openFile(file);
+      await openNote(app, file);
     } catch (error) {
       new Notice(String(error && error.message ? error.message : error));
     }
@@ -3423,6 +3422,107 @@ class ThinkerSettingTab extends PluginSettingTab {
   }
 }
 
+/* ------------------------------------------------------------ 12  Open a note */
+
+/* The page is an ItemView, and Obsidian refuses to navigate a leaf away from a view
+   that is not a file view. The click happens inside the page, so the page is the
+   active leaf, so every request handed to getLeaf(false) made Obsidian build a new
+   tab instead of using the one that was already there. A note now goes to the tab
+   that already holds it, else to the note tab used last, and a new tab is made only
+   when the main area has no note tab at all. */
+let lastNoteLeaf = null;
+
+function leafTypeOf(leaf) {
+  try {
+    const view = leaf && leaf.view;
+    return view && typeof view.getViewType === "function" ? view.getViewType() : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function isSidebarLeaf(workspace, leaf) {
+  try {
+    const root = leaf && typeof leaf.getRoot === "function" ? leaf.getRoot() : null;
+    if (!root) return false;
+    return root === workspace.leftSplit || root === workspace.rightSplit;
+  } catch (error) {
+    return false;
+  }
+}
+
+/* A note tab: markdown, in the main area, still attached. getLeavesOfType drops a
+   leaf as soon as it is closed, so membership doubles as the liveness test and a
+   leaf held from an earlier session cannot be written into. */
+function isNoteLeaf(app, leaf) {
+  if (!leaf) return false;
+  if (leafTypeOf(leaf) !== "markdown") return false;
+  if (isSidebarLeaf(app.workspace, leaf)) return false;
+  const leaves = app.workspace.getLeavesOfType("markdown") || [];
+  return leaves.indexOf(leaf) >= 0;
+}
+
+function noteLeafShowing(app, file) {
+  let hit = null;
+  app.workspace.iterateAllLeaves((leaf) => {
+    if (hit) return;
+    if (!isNoteLeaf(app, leaf)) return;
+    const open = leaf.view && leaf.view.file;
+    if (open && open.path === file.path) hit = leaf;
+  });
+  return hit;
+}
+
+function reusableNoteLeaf(app) {
+  if (isNoteLeaf(app, lastNoteLeaf)) return lastNoteLeaf;
+  let recent = null;
+  try {
+    recent = typeof app.workspace.getMostRecentLeaf === "function" ? app.workspace.getMostRecentLeaf() : null;
+  } catch (error) {
+    recent = null;
+  }
+  if (isNoteLeaf(app, recent)) return recent;
+  for (const leaf of app.workspace.getLeavesOfType("markdown") || []) {
+    if (isNoteLeaf(app, leaf)) return leaf;
+  }
+  return null;
+}
+
+/* Notes opened from the file explorer, the quick switcher or a link are the same
+   tabs this page hands files to, so the choice is remembered from the workspace
+   rather than only from the clicks this plugin makes. */
+function rememberNoteLeaf(app) {
+  const leaf = app.workspace.activeLeaf;
+  if (isNoteLeaf(app, leaf)) lastNoteLeaf = leaf;
+}
+
+/* newTab is the ctrl/cmd click and the "open in new tab" menu entry. Everything
+   else replaces the content of the note tab that is already open. */
+async function openNote(app, file, options) {
+  if (!file) return null;
+  const opts = options || {};
+  const { workspace } = app;
+  if (opts.newTab !== true) {
+    const shown = noteLeafShowing(app, file);
+    if (shown) {
+      await workspace.revealLeaf(shown);
+      lastNoteLeaf = shown;
+      return shown;
+    }
+    const target = reusableNoteLeaf(app);
+    if (target) {
+      await target.openFile(file);
+      lastNoteLeaf = target;
+      return target;
+    }
+  }
+  const leaf = workspace.getLeaf("tab");
+  if (!leaf) return null;
+  await leaf.openFile(file);
+  lastNoteLeaf = leaf;
+  return leaf;
+}
+
 /* --------------------------------------------------------------- 14  Plugin */
 
 class ThinkerPlugin extends Plugin {
@@ -3455,6 +3555,7 @@ class ThinkerPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE, (leaf) => new HomeView(leaf, this.viewDeps()));
     this.registerView(STATS_VIEW_TYPE, (leaf) => new StatsView(leaf, this.statsDeps()));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => rememberNoteLeaf(this.app)));
     this.addSettingTab(new ThinkerSettingTab(this.app, this));
     this.addCommands();
     this.addRibbonIcon("home", t("ribbon.home"), () => void this.openHome(false));
@@ -3915,7 +4016,9 @@ module.exports._internals = {
   ThinkerPlugin,
   RecordModal,
   openDiary,
-  diaryPathFor
+  diaryPathFor,
+  openNote,
+  rememberNoteLeaf
 };
 
 
