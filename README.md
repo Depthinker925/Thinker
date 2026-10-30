@@ -6,15 +6,6 @@ Obsidian 起始页插件：一个视图里放着时钟、笔记清单、专注�
 
 ![Thinker](assets/Thinker.png)
 
-| Item / 项 | Value / 内容 |
-| --- | --- |
-| Plugin id / 插件 id | `thinker` |
-| Version / 版本 | 3.3.2 |
-| Minimum Obsidian / 最低版本 | 1.13.0 |
-| Platform / 平台 | Desktop only / 仅桌面端 |
-| Author / 作者 | Depthinker |
-| Data folder / 数据目录 | `FocusLog` |
-
 ---
 
 ## Buy me a coffee (optional)  |  支持作者（可选）
