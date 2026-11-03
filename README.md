@@ -34,7 +34,7 @@ The list is built from markdown files in the vault, grouped by folder. The index
 
 Chips along the top are the folders themselves plus three ranges that cross folders: All, Recent, Pinned. Pinned notes come from a path list typed into the settings.
 
-Search runs over titles or over full text, and full-text hits show a snippet. Order is by name or by modified time, each ascending or descending; Recent stays on newest first. A cap keeps the list short, hidden folders stay out, and every row carries its relative modified time. The context menu opens a note in a new tab, renames it, copies its path, or deletes it.
+The magnifier opens a search field out of the row and closes it again; Esc closes and clears. Search runs over titles or over full text, and full-text hits show a snippet. Order is by name or by modified time, each ascending or descending; Recent stays on newest first. A cap keeps the list short, hidden folders stay out, and every row carries its relative modified time. The context menu opens a note in a new tab, renames it, copies its path, or deletes it.
 
 ### Timer
 
@@ -52,7 +52,7 @@ A month grid draws every day as a square box and fills it by that day's focus, i
 
 ### Statistics
 
-The statistics view lives in the right sidebar and switches between day, week and month. It shows the total for the period, session count, daily average, focus and rest time, and the longest session.
+The statistics view lives in the right sidebar and switches between day, week, month and a range. It shows the total for the period, session count, daily average, focus and rest time, and the longest session. The range tab takes any two dates through two native date fields; the arrows step by the length of the span rather than by a day, the chart groups the days so a long span stays a readable number of columns, and the unit and the two dates are remembered between sessions.
 
 ### Daily notes
 
@@ -91,6 +91,16 @@ rest-count: 3
 | `open-stats` | Open focus statistics |
 
 ### Changelog
+#### 4.0.0
+
+The search field no longer sits in the notes column. The row is one magnifier until it is asked for; pressing it opens a field out of the icon to the right, and pressing it again closes the row and gives the width back to the list. Opening runs fast then slow, closing slow then fast: the two directions are not the same gesture, so they do not share a curve. Esc closes and clears, and so does opening a note or switching folder. Text that has been committed by an input method is told apart from a keystroke, so the Enter that accepts a 拼音 candidate no longer opens or creates a note.
+
+Statistics can be asked about any two dates. A fourth tab takes a start and an end through two native date fields, the arrows step by the whole span, and the chart groups the days, so a year stays a dozen columns instead of three hundred and sixty-five. The unit and the two dates are saved with the plugin's settings, so the panel reopens on the period you were last looking at rather than on this week. The total line is now labelled for the unit it belongs to — it said "This week" over a single day and over a month — and the daily average divides by the days that have passed rather than by the days the month contains.
+
+The new note command no longer focuses the field. With a filter already typed it creates that note; with nothing typed it opens the creation dialog.
+
+Day files are cached against their modified time, so moving through statistics stops re-reading the same days, and every write invalidates its own day.
+
 #### 3.4.3
 
 The manifest published with 3.4.2 differed from the one in this repository. Version strings are aligned; no other change.
@@ -148,7 +158,7 @@ Thinker 只注册一个视图。它随 Obsidian 启动打开，打开时收起�
 
 顶部一行是分类：文件夹分类对应真实目录，另外三个跨目录，分别是全部、最近、收藏。收藏来自设置里手填的路径列表。
 
-搜索可在标题与全文之间切换，全文命中会带出片段。排序有名称与修改时间，各自可升可降；最近一栏固定按时间倒序。列表有条数上限，隐藏目录不进清单，每行右侧是相对修改时间。右键菜单可以新标签页打开、重命名、复制路径、删除。
+点放大镜，搜索框从图标右侧展开，再点一次收起；Esc 收起并清空。可在标题与全文之间切换，全文命中会带出片段。排序有名称与修改时间，各自可升可降；最近一栏固定按时间倒序。列表有条数上限，隐藏目录不进清单，每行右侧是相对修改时间。右键菜单可以新标签页打开、重命名、复制路径、删除。
 
 ### 计时器
 
@@ -166,7 +176,7 @@ Thinker 只注册一个视图。它随 Obsidian 启动打开，打开时收起�
 
 ### 统计
 
-右侧栏另有一个统计视图，按日、周、月切换，显示本期合计、会话数、日均、专注与休息时长，以及最长的一次。
+右侧栏另有一个统计视图，按日、周、月、区间切换，显示本期合计、会话数、日均、专注与休息时长，以及最长的一次。区间页签用两个原生日期框选任意起止，箭头按整段长度平移而不是按天，图表会按天数分组，长区间也只剩十几根柱；页签与这两个日期会记住，下次打开还是上次看的那一段。
 
 ### 日记
 
@@ -205,6 +215,16 @@ rest-count: 3
 | `open-stats` | 打开专注统计 |
 
 ### 更新日志
+#### 4.0.0
+
+笔记栏不再常驻搜索框。这一行平时只有一个放大镜，按下它，搜索框从图标右侧长出来，再按一次收起，宽度还给清单。伸出是先快后慢，缩回是先慢后快，两个方向不是同一个手势，所以曲线也不同。Esc 收起并清空，打开笔记或切文件夹同样清空。上屏的文字与普通按键分开处理，确认拼音候选的 Enter 不再打开或新建笔记。
+
+统计可以问任意一段日期。第四个页签用两个原生日期框填起止，箭头按整段平移，图表按天数分组，一年只剩十几根柱而不是三百六十五根。页签与这两个日期会随插件设置一起保存，下次打开还是上次看的那一段，不再回到本周。合计一行按所用单位取词，此前单日与整月都写着「本周合计」；日均改按已经过去的天数算，不再拿月总数除以整月天数。
+
+新建笔记的命令不再把光标塞进搜索框。已输入过滤词就用它当标题建，没有就打开新建对话框。
+
+每日文件按修改时间缓存，翻统计不再重复读同一批文件，每次写入都会作废当天。
+
 #### 3.4.3
 
 3.4.2 附带的 manifest 与仓库中的文件不一致。本版对齐版本号，其余未改动。

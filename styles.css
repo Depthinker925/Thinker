@@ -337,63 +337,119 @@ body.is-thinker-booting .workspace .workspace-ribbon.side-dock-ribbon.mod-left {
 	flex-direction: column;
 }
 
-/* A field, not an underline: this is the one thing on the page you type into. */
+/* One row, one icon, and a field that grows out of the icon to the right when it
+   is asked for. The wrapper carries the width and clips what is inside it, so the
+   field reads as being drawn out of the icon rather than as appearing. */
 .view-content.thinker-home .thinker-search {
 	flex: 0 0 auto;
 	margin-top: var(--tk-2);
 	display: flex;
 	align-items: center;
 	gap: var(--tk-2);
-	height: var(--tk-7);
+	min-height: var(--tk-target);
 	padding: 0 var(--tk-3);
+}
+
+.view-content.thinker-home .thinker-search-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: var(--tk-target);
+	height: var(--tk-target);
+	padding: 0;
+	border: none;
+	border-radius: var(--tk-r-sm);
+	background: none;
+	box-shadow: none;
+	color: var(--text-faint);
+	cursor: pointer;
+	transition: color var(--tk-dur) var(--tk-ease);
+}
+
+.view-content.thinker-home .thinker-search-toggle:hover {
+	color: var(--text-normal);
+}
+
+.view-content.thinker-home .thinker-search-toggle.is-on {
+	color: var(--tk-accent);
+}
+
+.view-content.thinker-home .thinker-search-toggle .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+/* Two transitions, one per direction, because the pair is not symmetric.
+   Closing runs slow then fast: the row is on its way out and the eye does not
+   have to follow it. Opening runs fast then slow, so the field is ready to take a
+   character almost at once and settles its last few pixels gently. */
+.view-content.thinker-home .thinker-search-field {
+	flex: 0 0 auto;
+	width: 0;
+	overflow: hidden;
+	opacity: 0;
+	transition: width 200ms cubic-bezier(0.7, 0, 0.84, 0), opacity 120ms linear 60ms;
+}
+
+.view-content.thinker-home .thinker-search.is-open .thinker-search-field {
+	width: calc(100% - var(--tk-target) - var(--tk-2));
+	opacity: 1;
+	transition: width 320ms cubic-bezier(0.12, 0.8, 0.24, 1), opacity 90ms linear;
+}
+
+.view-content.thinker-home .thinker-search-input,
+.view-content.thinker-home .thinker-search-input:focus {
+	width: 100%;
+	height: var(--tk-target);
+	/* Explicit, because the padding is part of the width here: the wrapper clips
+	   this box, and a content-box input would lose its last few pixels of text. */
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0 var(--tk-2);
 	border: 0.5px solid var(--tk-hair);
-	border-radius: var(--tk-r-md);
-	background: var(--background-secondary);
-	transition: border-color var(--tk-dur) var(--tk-ease), background-color var(--tk-dur) var(--tk-ease);
+	border-radius: var(--tk-r-sm);
+	background: transparent;
+	box-shadow: none;
+	outline: none;
+	font-family: inherit;
+	font-size: var(--tk-fs-sm);
+	color: var(--text-normal);
+	transition: border-color var(--tk-dur) var(--tk-ease);
+}
+
+.view-content.thinker-home .thinker-search-input:focus {
+	border-color: var(--tk-accent-edge);
+}
+
+.view-content.thinker-home .thinker-search-input::placeholder {
+	color: var(--text-faint);
+}
+
+/* One line above the list, and only while there is something to say: the count of
+   hits, or the fact that typing here filters. A filter that outlived a blur has
+   to be readable, or the list is quietly short and nobody knows why. */
+.view-content.thinker-home .thinker-search-status {
+	display: none;
+	flex: 0 0 auto;
+	padding: 0 var(--tk-3) var(--tk-1);
+	font-size: var(--tk-fs-xs);
+	line-height: 1.6;
+	color: var(--text-faint);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.view-content.thinker-home .thinker-search-status.is-on {
+	display: block;
 }
 
 /* The notes panel stays greyscale. Its only job is to say which note is which, and a
    second colour on top of a column of names has to be learned before it can be read.
    State is carried by weight and by grey: an open tab darkens and keeps a hairline
    under it, a pressed button darkens, a selected row takes a grey edge. */
-
-.view-content.thinker-home .thinker-search:focus-within {
-	border-color: var(--text-muted);
-}
-
-.view-content.thinker-home .thinker-search-icon {
-	display: flex;
-	align-items: center;
-	color: var(--text-faint);
-	flex: 0 0 auto;
-}
-
-.view-content.thinker-home .thinker-search-icon .svg-icon {
-	width: 15px;
-	height: 15px;
-}
-
-/* Two classes, not one: themes ship `input[type="text"] { width: 100% }`, which
-   would push the field past its container and under the icon. */
-.view-content.thinker-home .thinker-search .thinker-search-input,
-.view-content.thinker-home .thinker-search .thinker-search-input:focus {
-	flex: 1 1 0;
-	width: auto;
-	max-width: 100%;
-	min-width: 0;
-	height: 100%;
-	padding: 0;
-	border: none;
-	border-radius: 0;
-	background: transparent;
-	box-shadow: none;
-	font-size: var(--tk-fs-md);
-	color: var(--text-normal);
-}
-
-.view-content.thinker-home .thinker-search-input::placeholder {
-	color: var(--text-faint);
-}
 
 /* Two levels of navigation share one block. The rule belongs to the block, not
    to the first row, so it always closes whichever level is showing. */
@@ -1237,6 +1293,57 @@ body.is-thinker-booting .workspace .workspace-ribbon.side-dock-ribbon.mod-left {
 	border-bottom: 0.5px solid var(--tk-hair);
 }
 
+/* Two native date fields and a dash, on the same hairline as the arrows. No
+   fill and no shadow: a sidebar with three filled controls in it reads as a form.
+   The native picker follows the theme through color-scheme, so it needs no
+   filter of its own. */
+.thinker-stats-rangebar {
+	display: flex;
+	align-items: center;
+	gap: var(--tk-2);
+	padding: var(--tk-2) 0 var(--tk-1);
+}
+
+.thinker-stats .thinker-range-date {
+	flex: 1 1 0;
+	min-width: 0;
+	height: var(--tk-target);
+	padding: 0 var(--tk-2);
+	border: 0.5px solid var(--tk-hair);
+	border-radius: var(--tk-r-sm);
+	background: transparent;
+	box-shadow: none;
+	font-family: inherit;
+	font-size: var(--tk-fs-sm);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.thinker-stats .thinker-range-date:hover {
+	border-color: var(--tk-accent-edge);
+}
+
+.thinker-stats .thinker-range-date:focus {
+	border-color: var(--tk-accent);
+	color: var(--text-normal);
+	outline: none;
+}
+
+.thinker-stats .thinker-range-date::-webkit-calendar-picker-indicator {
+	opacity: 0.45;
+	cursor: pointer;
+}
+
+.thinker-stats .thinker-range-date::-webkit-calendar-picker-indicator:hover {
+	opacity: 1;
+}
+
+.thinker-range-dash {
+	flex: 0 0 auto;
+	color: var(--text-faint);
+	font-size: var(--tk-fs-xs);
+}
+
 /* Three numbers as a ledger: a sidebar is narrow, and a big number in a third of
    280px would truncate the moment the value grows. */
 .thinker-stats-label {
@@ -1276,15 +1383,22 @@ body.is-thinker-booting .workspace .workspace-ribbon.side-dock-ribbon.mod-left {
 	white-space: nowrap;
 }
 
-/* ---------- week: seven bars ---------- */
+/* ---------- week and range: one bar per column ---------- */
 
+/* Seven is the week's own count and stays the default; a range sets --tk-cols to
+   however many columns it grouped its days into. */
 .thinker-stats-chart {
 	display: grid;
-	grid-template-columns: repeat(7, minmax(0, 1fr));
+	grid-template-columns: repeat(var(--tk-cols, 7), minmax(0, 1fr));
 	gap: var(--tk-1);
 	height: 132px;
 	padding: var(--tk-1) 0 var(--tk-2);
 	border-bottom: 0.5px solid var(--tk-hair);
+}
+
+/* Past a dozen columns the gap costs more than the bar it separates. */
+.thinker-stats-chart.is-dense {
+	gap: 1px;
 }
 
 .thinker-bar-col {

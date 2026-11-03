@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "3.4.3 · day grid, square cells";
+const BUILD = "4.0.0 · search opens, range stays";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -26,7 +26,12 @@ const DATA_VERSION = 1;
 const EN = {
   "clock.focusToday": "Focused {duration}",
   "stats.title": "Focus",
-  "stats.total": "This week",
+  /* Four totals, one per unit: a single key that said "This week" over a day and
+     over a month was a caption for the wrong number. */
+  "stats.totalDay": "This day",
+  "stats.totalWeek": "This week",
+  "stats.totalMonth": "This month",
+  "stats.totalRange": "In range",
   "stats.sessions": "Sessions",
   "stats.average": "Daily average",
   "stats.focus": "Focus",
@@ -35,10 +40,17 @@ const EN = {
   "stats.day": "D",
   "stats.week": "W",
   "stats.month": "M",
+  "stats.range": "Range",
+  "stats.rangeStart": "Start date",
+  "stats.rangeEnd": "End date",
+  "stats.rangeEmpty": "Pick two dates",
+  "stats.rangeCap": "Up to {count} days",
+  "stats.days": "{count} days",
+  "stats.last7": "Last 7 days",
   "stats.prev": "Previous period",
   "stats.next": "Next period",
   "stats.untagged": "Untagged",
-  "stats.unit": "Switch between day, week and month",
+  "stats.unit": "Switch between day, week, month and range",
   "stats.backToday": "Back to today",
   "stats.empty": "Nothing recorded here",
   "stats.numbers": "Numbers",
@@ -50,6 +62,10 @@ const EN = {
   "cmd.stats": "Open focus statistics",
 
   "notes.placeholder": "Search {count} notes",
+  "notes.searchLabel": "Search notes",
+  "notes.hits": "{count} found",
+  "notes.clearHint": "Esc to clear",
+  "notes.typeToFilter": "Type to filter",
   "notes.all": "All",
   "notes.recent": "Recent",
   "notes.pinned": "Pinned",
@@ -203,7 +219,10 @@ const EN = {
 const ZH = {
   "clock.focusToday": "今日专注 {duration}",
   "stats.title": "专注",
-  "stats.total": "本周合计",
+  "stats.totalDay": "当天合计",
+  "stats.totalWeek": "本周合计",
+  "stats.totalMonth": "本月合计",
+  "stats.totalRange": "区间合计",
   "stats.sessions": "次数",
   "stats.average": "日均",
   "stats.focus": "专注",
@@ -212,10 +231,17 @@ const ZH = {
   "stats.day": "日",
   "stats.week": "周",
   "stats.month": "月",
+  "stats.range": "区间",
+  "stats.rangeStart": "开始日期",
+  "stats.rangeEnd": "结束日期",
+  "stats.rangeEmpty": "选择起止日期",
+  "stats.rangeCap": "最多 {count} 天",
+  "stats.days": "{count} 天",
+  "stats.last7": "最近 7 天",
   "stats.prev": "上一段",
   "stats.next": "下一段",
   "stats.untagged": "未标记",
-  "stats.unit": "在日 / 周 / 月之间切换",
+  "stats.unit": "在日 / 周 / 月 / 区间之间切换",
   "stats.backToday": "回到今天",
   "stats.empty": "这一段时间没有记录",
   "stats.numbers": "数值",
@@ -227,6 +253,10 @@ const ZH = {
   "cmd.stats": "打开专注统计",
 
   "notes.placeholder": "搜索 {count} 篇笔记",
+  "notes.searchLabel": "搜索笔记",
+  "notes.hits": "{count} 条命中",
+  "notes.clearHint": "Esc 清空",
+  "notes.typeToFilter": "直接输入即筛选",
   "notes.all": "全部",
   "notes.recent": "最近",
   "notes.pinned": "收藏",
@@ -436,6 +466,92 @@ function weekDays(dayKey, weekStart) {
     out.push(dateKeyOfDate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
   }
   return out;
+}
+
+/* ------------------------------------------------------------- 2b  ranges
+
+   A stretch of time the calendar has no name for: any two days. Both ends are
+   included. The cap is a year and a half short of five: it exists only so a
+   mistyped year cannot ask the store for half a million empty files. */
+
+const RANGE_MAX_DAYS = 1826;
+
+function isDateKey(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
+  /* 2026-02-30 passes the pattern; only a round trip through Date rejects it. */
+  return dateKeyOfDate(parseDateKey(value)) === value;
+}
+
+/* The two ends may arrive in either order: a pair typed backwards is a typo, not
+   an empty period, so it is swapped instead of dropped. `clamped` tells the
+   caller the far end was cut. */
+function rangeDays(startKey, endKey, max) {
+  const limit = max || RANGE_MAX_DAYS;
+  if (!isDateKey(startKey) || !isDateKey(endKey)) {
+    return { keys: [], start: "", end: "", clamped: false };
+  }
+  let from = parseDateKey(startKey);
+  let to = parseDateKey(endKey);
+  if (from.getTime() > to.getTime()) {
+    const swap = from;
+    from = to;
+    to = swap;
+  }
+  const keys = [];
+  const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  while (cursor.getTime() <= to.getTime() && keys.length < limit) {
+    keys.push(dateKeyOfDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { keys, start: keys[0], end: keys[keys.length - 1], clamped: keys.length >= limit };
+}
+
+/* Calendar days only: setDate walks the wall clock, so months, years and the
+   leap day all fall out of it without arithmetic. */
+function addDays(dayKey, days) {
+  const date = parseDateKey(dayKey);
+  const step = Number(days) || 0;
+  date.setDate(date.getDate() + step);
+  return dateKeyOfDate(date);
+}
+
+/* A bar chart stops being readable long before thirty-one columns: at 280px a
+   column is seven pixels wide. Past a fortnight the days are grouped, first into
+   weeks counted from the start of the range, then into months, so the column
+   count stays under fifty-three whatever the span. */
+const RANGE_DAILY_MAX = 14;
+const RANGE_WEEKLY_MAX = 70;
+
+/* keys are consecutive and ordered. Seconds per bucket add up to seconds per day:
+   the grouping decides the shape, never the total. */
+function rangeBuckets(keys, secondsOf) {
+  const count = keys.length;
+  if (count === 0) return [];
+  if (count <= RANGE_DAILY_MAX) {
+    return keys.map((key) => ({ key, label: shortDay(key), first: key, last: key, seconds: secondsOf(key) }));
+  }
+  const weekly = count <= RANGE_WEEKLY_MAX;
+  const out = [];
+  const byKey = new Map();
+  keys.forEach((key, index) => {
+    /* A week bucket starts where the range starts, not on a Monday: thirty days
+       is then four whole columns and a remainder, not six ragged ones. */
+    const bucketKey = weekly ? keys[Math.floor(index / 7) * 7] : key.slice(0, 7);
+    let bucket = byKey.get(bucketKey);
+    if (!bucket) {
+      bucket = { key: bucketKey, label: weekly ? shortDay(key) : monthLabel(key), first: key, last: key, seconds: 0 };
+      byKey.set(bucketKey, bucket);
+      out.push(bucket);
+    }
+    bucket.last = key;
+    bucket.seconds += secondsOf(key);
+  });
+  return out;
+}
+
+function monthLabel(monthKey) {
+  if (lang === "zh") return `${Number(monthKey.slice(5, 7))} 月`;
+  return parseDateKey(`${monthKey}-01`).toLocaleDateString("en-US", { month: "short" });
 }
 
 function weekdayLabels(weekStart) {
@@ -907,6 +1023,12 @@ class DayStore {
   constructor(app, getSettings) {
     this.app = app;
     this.getSettings = getSettings;
+    /* path -> { mtime, records }. Shifting a range or changing its far end asks
+       for the same two hundred days again, and every one of those reads would
+       return the same bytes. The file tree is already in memory, so a hit costs
+       a modified-time comparison instead of a read. */
+    this.cache = new Map();
+    this.cacheLimit = 900;
   }
 
   folder() {
@@ -915,6 +1037,20 @@ class DayStore {
 
   pathFor(dayKey) {
     return `${this.folder()}/${dayKey.slice(0, 4)}/${dayKey}.md`;
+  }
+
+  /* Only files this store writes are cached; the folder is read from the settings
+     on every call, so a change of dataFolder simply stops matching. */
+  isLogPath(path) {
+    return typeof path === "string" && path.startsWith(`${this.folder()}/`) && path.endsWith(".md");
+  }
+
+  invalidate(path) {
+    if (path) this.cache.delete(path);
+  }
+
+  invalidateAll() {
+    this.cache.clear();
   }
 
   samplePath() {
@@ -942,19 +1078,39 @@ class DayStore {
   async getDay(dayKey) {
     const path = this.pathFor(dayKey);
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!file) return [];
+    if (!file) {
+      this.cache.delete(path);
+      return [];
+    }
+    const mtime = file.stat ? file.stat.mtime : 0;
+    const hit = this.cache.get(path);
+    if (hit && hit.mtime === mtime) return hit.records.slice();
     try {
       const text = await this.app.vault.read(file);
-      return parseDayFile(text);
+      const records = parseDayFile(text);
+      if (this.cache.size >= this.cacheLimit) {
+        const oldest = this.cache.keys().next().value;
+        if (oldest !== undefined) this.cache.delete(oldest);
+      }
+      this.cache.set(path, { mtime, records });
+      /* A copy, every time: addRecord pushes onto what it gets back, and a
+         shared array would keep a record that never reached the disk. */
+      return records.slice();
     } catch (e) {
       return [];
     }
   }
 
+  /* Batched, because a year is three hundred promises at once and the vault does
+     not enjoy that. A cached day makes its batch free. */
   async getDays(dayKeys) {
     const map = new Map();
-    const results = await Promise.all(dayKeys.map((key) => this.getDay(key)));
-    dayKeys.forEach((key, i) => map.set(key, results[i]));
+    const batch = 8;
+    for (let at = 0; at < dayKeys.length; at += batch) {
+      const slice = dayKeys.slice(at, at + batch);
+      const records = await Promise.all(slice.map((key) => this.getDay(key)));
+      slice.forEach((key, index) => map.set(key, records[index]));
+    }
     return map;
   }
 
@@ -980,6 +1136,10 @@ class DayStore {
     const path = this.pathFor(dayKey);
     const text = buildDayFile(dayKey, records);
     const file = this.app.vault.getAbstractFileByPath(path);
+    /* Dropped before the write, not after: whatever happens next, the next read
+       comes back from the file, so the panel cannot keep showing a day the disk
+       disagrees with. */
+    this.invalidate(path);
     if (file) {
       await this.app.vault.process(file, () => text);
       return;
@@ -1360,6 +1520,14 @@ class NotePanel {
     this.pendingQuery = "";
     this.reordering = false;
     this.dragging = null;
+    /* The row starts as an icon and opens into a field, and `composing` keeps
+       拼音 away from the filter until the word is committed. */
+    this.searchOn = false;
+    this.composing = false;
+    this.barEl = null;
+    this.fieldEl = null;
+    this.toggleEl = null;
+    this.statusEl = null;
   }
 
   /* The order of the range row is the user's, not the vault's. The pencil writes
@@ -1417,6 +1585,13 @@ class NotePanel {
         this.pickChip(chip);
       }
     });
+    /* Above the list, because it reports on the list, and only while it has
+       something to report: a permanent row would cost a line of height every day
+       for a sentence that is empty most days. */
+    this.statusEl = root.createDiv({
+      cls: "thinker-search-status",
+      attr: { role: "status", "aria-live": "polite" }
+    });
     this.list = root.createDiv({ cls: "thinker-list" });
     this.list.addEventListener("click", (evt) => {
       const row = evt.target && evt.target.closest ? evt.target.closest(".thinker-note") : null;
@@ -1457,13 +1632,43 @@ class NotePanel {
     });
 
     /* The field sits under the list. Reading the list is the main act here;
-       searching is what you do after scanning, so it belongs at the bottom. */
+       searching is what you do after scanning, so it belongs at the bottom. The
+       row is one icon until it is asked for, then a field grows out of the icon
+       to the right, and the width comes back the moment the search is over. */
     const bar = root.createDiv({ cls: "thinker-search" });
-    const icon = bar.createDiv({ cls: "thinker-search-icon" });
-    setIcon(icon, "search");
-    this.input = bar.createEl("input", {
+    this.barEl = bar;
+    bar.setAttribute("role", "search");
+    this.toggleEl = bar.createEl("button", { cls: "thinker-search-toggle", attr: { type: "button" } });
+    setIcon(this.toggleEl, "search");
+    this.toggleEl.setAttribute("aria-pressed", "false");
+    /* Pressing the icon must not take the focus from the field first: a blur
+       would close the row, and the click would then read as a fresh opening
+       instead of the way out. */
+    this.toggleEl.addEventListener("mousedown", (evt) => evt.preventDefault());
+    this.toggleEl.addEventListener("click", () => this.toggleSearch());
+
+    /* The wrapper is the thing that animates: its width runs from nothing to the
+       rest of the row, and the overflow keeps the field from being painted outside
+       it, so the field looks drawn out rather than switched on. */
+    this.fieldEl = bar.createDiv({ cls: "thinker-search-field" });
+    this.input = this.fieldEl.createEl("input", {
       cls: "thinker-search-input",
-      attr: { type: "text", spellcheck: "false", autocomplete: "off", placeholder: "" }
+      attr: { type: "text", spellcheck: "false", autocomplete: "off" }
+    });
+    /* A rebuild has to hand the words back, or the list stays filtered while the
+       field looks empty and the first keystroke throws the filter away. */
+    this.input.value = this.pendingQuery;
+
+    this.input.addEventListener("compositionstart", () => {
+      this.composing = true;
+    });
+    /* While a word is being composed the value is 拼音, and filtering on it
+       empties the list mid-word. The filter waits for the commit. */
+    this.input.addEventListener("compositionend", () => {
+      this.composing = false;
+      this.pendingQuery = this.input.value;
+      this.selected = 0;
+      this.refreshRows();
     });
     /* Rebuilt on every keystroke, on purpose. A debounce here looks like an
        optimisation and is a bug: Enter is handled on the same element, so a fast
@@ -1471,21 +1676,99 @@ class NotePanel {
        open the wrong note. The cost of six rebuilds of a forty-row list is smaller
        than the cost of that. */
     this.input.addEventListener("input", () => {
+      if (this.composing) return;
       this.pendingQuery = this.input.value;
       this.selected = 0;
       this.refreshRows();
     });
     this.input.addEventListener("keydown", (evt) => this.onKeyDown(evt));
-
+    /* Losing focus drops the mode, never the words. A blur that also rebuilt the
+       list would delete the row the mouse is on its way to, and the click would
+       land on nothing. Clearing belongs to the four explicit exits. */
+    this.input.addEventListener("blur", () => {
+      this.searchOn = false;
+      this.syncSearch();
+    });
 
     this.refresh();
+  }
+
+  /* One place decides what the search looks like, and every entry and exit calls
+     it, so the icon, the hint line and searchOn cannot disagree. */
+  syncSearch() {
+    if (!this.toggleEl || !this.input) return;
+    const active = this.searchOn === true;
+    const query = this.pendingQuery || "";
+    const total = this.deps.index.entries.length;
+    const count = total.toLocaleString(lang === "zh" ? "zh-CN" : "en-US");
+    const hint = t("notes.placeholder", { count });
+    this.toggleEl.toggleClass("is-on", active || query.length > 0);
+    this.toggleEl.setAttribute("aria-pressed", active ? "true" : "false");
+    this.toggleEl.setAttribute("aria-label", hint);
+    this.toggleEl.setAttribute("title", hint);
+    if (this.barEl) this.barEl.toggleClass("is-open", active);
+    this.input.placeholder = hint;
+    if (!this.statusEl) return;
+    /* A filter that survives a blur has to be visible, or the list is quietly
+       short and nobody knows why. */
+    if (!active && !query) {
+      this.statusEl.setText("");
+      this.statusEl.toggleClass("is-on", false);
+      return;
+    }
+    this.statusEl.setText(
+      query
+        ? `${t("notes.hits", { count: this.results.length })} · ${t("notes.clearHint")}`
+        : t("notes.typeToFilter")
+    );
+    this.statusEl.toggleClass("is-on", true);
+  }
+
+  toggleSearch() {
+    if (this.searchOn) {
+      this.endSearch(true);
+      return;
+    }
+    this.activateSearch();
+  }
+
+  activateSearch() {
+    if (!this.input) return;
+    this.searchOn = true;
+    /* Told to open before the focus lands, so the width starts moving in the same
+       frame: a field that unfolds after the caret has arrived reads as a jump. */
+    this.syncSearch();
+    this.input.focus();
+    const end = this.input.value.length;
+    try {
+      this.input.setSelectionRange(end, end);
+    } catch (e) {
+      /* some builds refuse a selection range before the focus has landed */
+    }
+  }
+
+  /* Leaving the mode is not leaving the words: `clear` decides whether the filter
+     goes with it. Clearing rebuilds the list, so a caller that also changes the
+     category must not call refreshRows twice. */
+  endSearch(clear) {
+    this.searchOn = false;
+    if (clear && this.pendingQuery !== "" && this.input) {
+      this.input.value = "";
+      this.pendingQuery = "";
+      this.selected = 0;
+      this.refreshRows();
+    } else {
+      this.syncSearch();
+    }
+    /* Blurred last: the row has already been told to close, and blurring first
+       would run the blur handler against the old state and drive the close twice. */
+    if (this.input && this.input.blur) this.input.blur();
   }
 
   refresh() {
     this.renderChips();
     this.refreshRows();
-    const total = this.deps.index.entries.length;
-    this.input.placeholder = t("notes.placeholder", { count: total.toLocaleString(lang === "zh" ? "zh-CN" : "en-US") });
+    this.syncSearch();
   }
 
   /* One route for both a click and a keypress on a chip. While the row is being
@@ -1497,7 +1780,12 @@ class NotePanel {
     this.category = key;
     this.selected = 0;
     this.renderChips();
-    this.refreshRows();
+    /* A different folder under the same filter reads as an empty folder. The
+       filter goes with the switch; endSearch rebuilds the list only if there was
+       something to clear. */
+    const hadQuery = this.pendingQuery !== "";
+    this.endSearch(true);
+    if (!hadQuery) this.refreshRows();
   }
 
   /* The list has one tab stop, not one per row: a vault with two hundred notes
@@ -1713,6 +2001,8 @@ class NotePanel {
     /* A fresh list has no keyboard cursor: the tint only appears once a key moves it. */
     this.keyboardNav = false;
     this.renderList();
+    /* The hit count is only known here, so the hint line is written here. */
+    this.syncSearch();
   }
 
   /* Folders are the headings of the list and notes sit under them. Level is a size,
@@ -1832,6 +2122,10 @@ class NotePanel {
   }
 
   onKeyDown(evt) {
+    /* An Enter that confirms a 拼音 candidate belongs to the input method: the
+       keydown still fires, and without this the word that arrives also opens or
+       creates a note. 229 is what the older builds report instead. */
+    if (evt.isComposing || this.composing || evt.keyCode === 229) return;
     if (evt.key === "ArrowDown") {
       evt.preventDefault();
       this.move(1);
@@ -1848,10 +2142,8 @@ class NotePanel {
       if (entry) this.openEntry(entry, evt.altKey);
       else void this.createFromQuery();
     } else if (evt.key === "Escape") {
-      this.input.value = "";
-      this.pendingQuery = "";
-      this.selected = 0;
-      this.refreshRows();
+      evt.preventDefault();
+      this.endSearch(true);
     }
   }
 
@@ -1871,6 +2163,9 @@ class NotePanel {
   openEntry(entry, newTab) {
     const file = entry.file || this.deps.app.vault.getAbstractFileByPath(entry.path);
     if (!file) return;
+    /* Both the mouse and the Enter key land here, and both are deliberate ends of
+       the search: the next look at the list should be the whole category. */
+    this.endSearch(true);
     void openNote(this.deps.app, file, { newTab: newTab === true });
   }
 
@@ -1927,8 +2222,11 @@ class NotePanel {
       { app: this.deps.app, index: this.deps.index },
       { name: (this.input.value || "").trim(), dir },
       (result) => {
+        /* The note is the point; the filter that happened to name it is not. */
+        this.searchOn = false;
         this.input.value = "";
         this.pendingQuery = "";
+        this.selected = 0;
         if (result.kind === "folder") this.category = result.path;
         this.renderChips();
         this.refreshRows();
@@ -1952,8 +2250,7 @@ class NotePanel {
     try {
       if (folder && !app.vault.getAbstractFileByPath(folder)) await app.vault.createFolder(folder);
       const file = await app.vault.create(path, "");
-      this.input.value = "";
-      this.pendingQuery = "";
+      this.endSearch(true);
       await openNote(app, file);
     } catch (e) {
       new Notice(String(e && e.message ? e.message : e));
@@ -2961,16 +3258,32 @@ class PostSessionPrompt extends Modal {
    The chart is the part that changes with the unit:
      日   the day as a 24-hour track, sessions drawn where they happened
      周   seven bars
-     月   the month as a heat grid, clicking a cell drills into that day */
+     月   the month as a heat grid, clicking a cell drills into that day
+     区间 any two days at all, grouped into as few columns as stay readable */
 
-const STATS_MODES = ["day", "week", "month"];
+const STATS_MODES = ["day", "week", "month", "range"];
+
+/* Which caption belongs to which unit: the total counts days, so it cannot be
+   called a week on the day tab. */
+const STATS_TOTAL_KEY = {
+  day: "stats.totalDay",
+  week: "stats.totalWeek",
+  month: "stats.totalMonth",
+  range: "stats.totalRange"
+};
 
 class StatsView extends ItemView {
   constructor(leaf, deps) {
     super(leaf);
     this.deps = deps;
-    this.mode = "week";
+    /* Reopened where it was left. The unit and the two dates are part of the
+       question being asked, and a span typed by hand yesterday is worth keeping. */
+    const saved = (deps && deps.getSettings && deps.getSettings()) || {};
+    this.mode = STATS_MODES.indexOf(saved.statsMode) >= 0 ? saved.statsMode : "week";
     this.anchor = todayKey();
+    this.rangeStart = saved.statsRangeStart || "";
+    this.rangeEnd = saved.statsRangeEnd || "";
+    this.focusField = "";
     this.token = 0;
   }
 
@@ -2999,7 +3312,28 @@ class StatsView extends ItemView {
     void this.render();
   }
 
+  /* Written on every render, and only when something actually moved: the arrows
+     get pressed six times in a row, and each press would otherwise rewrite the
+     whole settings file. */
+  rememberStats() {
+    const settings = this.deps.getSettings ? this.deps.getSettings() : null;
+    if (!settings) return;
+    const mode = STATS_MODES.indexOf(this.mode) >= 0 ? this.mode : "week";
+    if (
+      settings.statsMode === mode &&
+      settings.statsRangeStart === this.rangeStart &&
+      settings.statsRangeEnd === this.rangeEnd
+    ) {
+      return;
+    }
+    settings.statsMode = mode;
+    settings.statsRangeStart = this.rangeStart;
+    settings.statsRangeEnd = this.rangeEnd;
+    if (this.deps.saveSettings) void this.deps.saveSettings();
+  }
+
   periodInfo() {
+    if (this.mode === "range") return this.rangeInfo();
     const weekStart = this.deps.getSettings().weekStart;
     const date = parseDateKey(this.anchor);
     if (this.mode === "day") {
@@ -3022,7 +3356,36 @@ class StatsView extends ItemView {
     return { keys, label };
   }
 
+  /* Kept apart from the three calendar units: they always describe a period the
+     calendar names, this one only describes what the two fields say. */
+  rangeInfo() {
+    const span = rangeDays(this.rangeStart || this.anchor, this.rangeEnd || this.anchor);
+    if (span.keys.length === 0) return { keys: [], label: t("stats.rangeEmpty"), span };
+    /* Two dates in the same year are told apart by month and day; across a year
+       the year has to come back, or the label reads as four months. */
+    const sameYear = span.start.slice(0, 4) === span.end.slice(0, 4);
+    const name = (key) => (sameYear ? shortDay(key) : key.replace(/-/g, "."));
+    const label =
+      span.keys.length === 1
+        ? name(span.start)
+        : `${name(span.start)} – ${name(span.end)} · ${t("stats.days", { count: span.keys.length })}`;
+    return { keys: span.keys, label, span };
+  }
+
   shift(step) {
+    /* A range steps by its own length, so the arrows always show the next stretch
+       of the same size instead of the next day. */
+    if (this.mode === "range") {
+      const keys = this.periodInfo().keys;
+      const length = Math.max(1, keys.length);
+      const from = this.rangeStart || this.anchor;
+      const to = this.rangeEnd || this.anchor;
+      this.rangeStart = addDays(keys.length ? keys[0] : from, length * step);
+      this.rangeEnd = addDays(keys.length ? keys[keys.length - 1] : to, length * step);
+      this.anchor = this.rangeStart;
+      void this.render();
+      return;
+    }
     const date = parseDateKey(this.anchor);
     if (this.mode === "day") {
       date.setDate(date.getDate() + step);
@@ -3048,6 +3411,24 @@ class StatsView extends ItemView {
     root.addClass("thinker-stats");
 
     const period = this.periodInfo();
+    /* A pair typed backwards, or a span cut at the cap, is written back, so the
+       two fields and the label describe the same days. */
+    if (this.mode === "range" && period.span && period.span.keys.length > 0) {
+      this.rangeStart = period.span.start;
+      this.rangeEnd = period.span.end;
+    }
+    this.rememberStats();
+
+    /* The head is drawn before the read, not after it. Changing a date rebuilds
+       two inputs, and a rebuild that lands after an await takes the focus of the
+       field the user is still typing into. */
+    this.renderHead(root, period);
+    if (this.focusField) {
+      const node = this.focusField === "end" ? this.endInput : this.startInput;
+      this.focusField = "";
+      if (node && node.focus) node.focus();
+    }
+
     const map = await this.deps.storage.getDays(period.keys);
     if (token !== this.token) return;
 
@@ -3058,19 +3439,25 @@ class StatsView extends ItemView {
     const focusRecords = records.filter((record) => record.kind !== "rest");
     const total = focusRecords.reduce((sum, record) => sum + (Number(record.durationSec) || 0), 0);
     const longest = focusRecords.reduce((max, record) => Math.max(max, Number(record.durationSec) || 0), 0);
+    /* The average is over the days that have happened, not over the days the
+       period contains: on the third of a month, dividing by thirty asks the
+       numbers to describe a month that does not exist yet. */
+    const today = todayKey();
+    const elapsed = period.keys.filter((key) => key <= today).length;
+    const divisor = Math.max(1, elapsed > 0 ? elapsed : period.keys.length);
 
-    this.renderHead(root, period);
     root.createDiv({ cls: "thinker-stats-label", text: t("stats.numbers") });
     this.renderMetrics(root, {
       total,
       count: focusRecords.length,
-      average: Math.round(total / Math.max(1, period.keys.length)),
+      average: Math.round(total / divisor),
       longest
     });
 
     root.createDiv({ cls: "thinker-stats-label", text: t("stats.shape") });
     if (this.mode === "day") this.renderDayChart(root, records);
     else if (this.mode === "week") this.renderWeekChart(root, period.keys, map);
+    else if (this.mode === "range") this.renderRangeChart(root, period.keys, map);
     else this.renderMonthChart(root, period.keys, map);
 
     this.renderTags(root, records);
@@ -3084,8 +3471,14 @@ class StatsView extends ItemView {
     prev.addEventListener("click", () => this.shift(-1));
 
     const label = head.createEl("button", { cls: "thinker-stats-range", text: period.label });
-    label.setAttribute("aria-label", t("stats.backToday"));
+    label.setAttribute("aria-label", this.mode === "range" ? t("stats.last7") : t("stats.backToday"));
     label.addEventListener("click", () => {
+      /* On a range there is no "today" to go back to, so the button offers the
+         one span everybody means by default. */
+      if (this.mode === "range") {
+        this.rangeEnd = todayKey();
+        this.rangeStart = addDays(this.rangeEnd, -6);
+      }
       this.anchor = todayKey();
       void this.render();
     });
@@ -3102,25 +3495,76 @@ class StatsView extends ItemView {
       });
       tab.addEventListener("click", () => this.setMode(mode));
     }
+
+    if (this.mode === "range") this.renderRangeBar(root, period);
   }
 
   setMode(mode) {
     if (this.mode === mode) return;
+    /* Opening the range starts from whatever is on screen: a day is one day, a
+       week is that week, a month is that month. Nobody should have to retype a
+       period they were just looking at. */
+    if (mode === "range") {
+      const keys = this.periodInfo().keys;
+      if (keys.length > 0) {
+        this.rangeStart = keys[0];
+        this.rangeEnd = keys[keys.length - 1];
+      }
+    }
     this.mode = mode;
     void this.render();
   }
 
+  /* Native date fields, because the settings API has no date control and a
+     hand-built calendar would be a second calendar in a panel that already has
+     one. `change`, not `input`: a year typed digit by digit fires `input` four
+     times, and each one would read the same files again. */
+  renderRangeBar(root, period) {
+    const bar = root.createDiv({ cls: "thinker-stats-rangebar" });
+    this.startInput = bar.createEl("input", {
+      cls: "thinker-range-date",
+      attr: { type: "date", "aria-label": t("stats.rangeStart") }
+    });
+    this.startInput.value = this.rangeStart || this.anchor;
+    bar.createSpan({ cls: "thinker-range-dash", text: "–" });
+    this.endInput = bar.createEl("input", {
+      cls: "thinker-range-date",
+      attr: { type: "date", "aria-label": t("stats.rangeEnd") }
+    });
+    this.endInput.value = this.rangeEnd || this.anchor;
+
+    const commit = (which) => {
+      const field = which === "end" ? this.endInput : this.startInput;
+      const value = field.value;
+      /* A cleared or half-typed field is not an instruction; the old span stays
+         until a whole date arrives. */
+      if (!isDateKey(value)) return;
+      if (which === "end") this.rangeEnd = value;
+      else this.rangeStart = value;
+      this.focusField = which;
+      void this.render();
+    };
+    this.startInput.addEventListener("change", () => commit("start"));
+    this.endInput.addEventListener("change", () => commit("end"));
+
+    if (period.span && period.span.clamped) {
+      this.startInput.setAttribute("title", t("stats.rangeCap", { count: RANGE_MAX_DAYS }));
+      this.endInput.setAttribute("title", t("stats.rangeCap", { count: RANGE_MAX_DAYS }));
+    }
+  }
+
   renderMetrics(root, data) {
     const metrics = root.createDiv({ cls: "thinker-stats-metrics" });
+    const totalLabel = t(STATS_TOTAL_KEY[this.mode] || "stats.totalWeek");
     const rows =
       this.mode === "day"
         ? [
-            { label: t("stats.total"), value: formatDuration(data.total) },
+            { label: totalLabel, value: formatDuration(data.total) },
             { label: t("stats.sessions"), value: String(data.count) },
             { label: t("stats.longest"), value: formatDuration(data.longest) }
           ]
         : [
-            { label: t("stats.total"), value: formatDuration(data.total) },
+            { label: totalLabel, value: formatDuration(data.total) },
             { label: t("stats.sessions"), value: String(data.count) },
             { label: t("stats.average"), value: formatDuration(data.average) }
           ];
@@ -3200,6 +3644,40 @@ class StatsView extends ItemView {
     }
   }
 
+  /* One column per bucket, never one per day past a fortnight. The date row is
+     thinned to about eight entries: thirty-one dates in 280px is a grey line.
+     Clicking a column drills into its first day, which is where the work in it
+     started. */
+  renderRangeChart(root, keys, map) {
+    const seconds = new Map(keys.map((key) => [key, sumFocusDuration(map.get(key) || [])]));
+    const buckets = rangeBuckets(keys, (key) => seconds.get(key) || 0);
+    const chart = root.createDiv({ cls: "thinker-stats-chart" });
+    if (buckets.length === 0) return;
+    const max = Math.max(1, ...buckets.map((bucket) => bucket.seconds));
+    const today = todayKey();
+    chart.style.setProperty("--tk-cols", String(buckets.length));
+    if (buckets.length > 12) chart.addClass("is-dense");
+    const every = Math.ceil(buckets.length / 8);
+
+    buckets.forEach((bucket, index) => {
+      const col = chart.createDiv({ cls: "thinker-bar-col" });
+      if (bucket.first <= today && today <= bucket.last) col.addClass("is-today");
+      const track = col.createDiv({ cls: "thinker-bar-track" });
+      const bar = track.createDiv({ cls: "thinker-bar" });
+      bar.style.setProperty(
+        "--tk-bar-h",
+        bucket.seconds > 0 ? `${Math.max(4, Math.round((bucket.seconds / max) * 100))}%` : "0%"
+      );
+      const span =
+        bucket.first === bucket.last ? shortDay(bucket.first) : `${shortDay(bucket.first)} – ${shortDay(bucket.last)}`;
+      const description = `${span} · ${formatDuration(bucket.seconds)}`;
+      col.setAttribute("title", description);
+      col.setAttribute("aria-label", description);
+      col.createDiv({ cls: "thinker-bar-day", text: buckets.length <= 8 || index % every === 0 ? bucket.label : "" });
+      col.addEventListener("click", () => this.drill(bucket.first));
+    });
+  }
+
   renderTags(root, records) {
     root.createDiv({ cls: "thinker-stats-label", text: t("stats.share") });
     const focus = new Map();
@@ -3274,6 +3752,12 @@ const DEFAULT_SETTINGS = {
   weekStart: 1,
   dailyNotesFolder: "",
   dailyNotesFormat: "",
+  /* The statistics panel reopens on the last thing it was asked, including a
+     hand-picked pair of dates: a period you had to type twice is a period you
+     were looking at. */
+  statsMode: "week",
+  statsRangeStart: "",
+  statsRangeEnd: "",
 };
 
 function readSettings(raw) {
@@ -3316,6 +3800,9 @@ function readSettings(raw) {
     weekStart: Number(source.weekStart) === 0 ? 0 : 1,
     dailyNotesFolder: text("dailyNotesFolder"),
     dailyNotesFormat: text("dailyNotesFormat"),
+    statsMode: STATS_MODES.indexOf(source.statsMode) >= 0 ? source.statsMode : "week",
+    statsRangeStart: isDateKey(source.statsRangeStart) ? source.statsRangeStart : "",
+    statsRangeEnd: isDateKey(source.statsRangeEnd) ? source.statsRangeEnd : "",
   };
 }
 
@@ -3527,6 +4014,8 @@ class ThinkerSettingTab extends PluginSettingTab {
         text.setValue(settings.dataFolder);
         text.onChange((value) => {
           settings.dataFolder = value.trim() || "FocusLog";
+          /* The cache is keyed by path, and every path just moved. */
+          if (this.plugin.storage) this.plugin.storage.invalidateAll();
           commit();
         });
       });
@@ -3973,6 +4462,7 @@ class ThinkerPlugin extends Plugin {
       app: this.app,
       storage: this.storage,
       getSettings: () => this.settings,
+      saveSettings: () => this.saveSettings(),
       openDay: (dayKey, onChanged) => {
         new DayModal(this.viewDeps(), dayKey, () => {
           this.refreshStatsViews();
@@ -4065,6 +4555,9 @@ class ThinkerPlugin extends Plugin {
     const changed = debounce(() => this.refreshNoteViews(), 250);
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
+        /* An outside editor is the one writer the store cannot see, so the
+           modified-time in its cache is checked first and this event second. */
+        if (file && this.storage && this.storage.isLogPath(file.path)) this.storage.invalidate(file.path);
         if (file && file.extension === "md") {
           this.index.updateOne(file);
           changed();
@@ -4073,6 +4566,7 @@ class ThinkerPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("create", (file) => {
+        if (file && this.storage && this.storage.isLogPath(file.path)) this.storage.invalidate(file.path);
         if (file && file.extension === "md") {
           this.index.updateOne(file);
           changed();
@@ -4081,12 +4575,17 @@ class ThinkerPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
+        if (file && this.storage) this.storage.invalidate(file.path);
         this.index.removeOne(file.path);
         changed();
       })
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
+        if (this.storage) {
+          this.storage.invalidate(oldPath);
+          if (file) this.storage.invalidate(file.path);
+        }
         this.index.renameOne(file, oldPath);
         changed();
       })
@@ -4134,8 +4633,11 @@ class ThinkerPlugin extends Plugin {
       callback: () => {
         const view = this.homeViews()[0];
         if (view && view.notes) {
-          view.notes.input.focus();
-          void view.notes.createFromQuery();
+          /* Never focus the field: it has no box now, so putting the caret in it
+             would send the next word into a filter nobody can see. A word
+             already in the filter still names the note; without one, ask. */
+          if (view.notes.pendingQuery.trim()) void view.notes.createFromQuery();
+          else view.notes.openCreate();
           return;
         }
         void this.openHome(false);
@@ -4206,7 +4708,18 @@ module.exports._internals = {
   openDiary,
   diaryPathFor,
   openNote,
-  rememberNoteLeaf
+  rememberNoteLeaf,
+  EN,
+  ZH,
+  t,
+  isDateKey,
+  rangeDays,
+  addDays,
+  rangeBuckets,
+  monthLabel,
+  STATS_MODES,
+  RANGE_MAX_DAYS,
+  visibleRecords
 };
 
 
