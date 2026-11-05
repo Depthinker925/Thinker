@@ -90,48 +90,6 @@ rest-count: 3
 | `open-diary` | Open today's diary |
 | `open-stats` | Open focus statistics |
 
-### Changelog
-#### 4.0.0
-
-The search field no longer sits in the notes column. The row is one magnifier until it is asked for; pressing it opens a field out of the icon to the right, and pressing it again closes the row and gives the width back to the list. Opening runs fast then slow, closing slow then fast: the two directions are not the same gesture, so they do not share a curve. Esc closes and clears, and so does opening a note or switching folder. Text that has been committed by an input method is told apart from a keystroke, so the Enter that accepts a 拼音 candidate no longer opens or creates a note.
-
-Statistics can be asked about any two dates. A fourth tab takes a start and an end through two native date fields, the arrows step by the whole span, and the chart groups the days, so a year stays a dozen columns instead of three hundred and sixty-five. The unit and the two dates are saved with the plugin's settings, so the panel reopens on the period you were last looking at rather than on this week. The total line is now labelled for the unit it belongs to — it said "This week" over a single day and over a month — and the daily average divides by the days that have passed rather than by the days the month contains.
-
-The new note command no longer focuses the field. With a filter already typed it creates that note; with nothing typed it opens the creation dialog.
-
-Day files are cached against their modified time, so moving through statistics stops re-reading the same days, and every write invalidates its own day.
-
-#### 3.4.3
-
-The manifest published with 3.4.2 differed from the one in this repository. Version strings are aligned; no other change.
-
-#### 3.4.2
-
-Readme rewritten: the metadata table removed, two donation codes added. The plugin is the same as 3.4.1.
-
-#### 3.4.1
-
-The day grid is square. Every cell takes the same gutter on both axes, and the month height now comes from its width through the ratio 7/6, so the cells stay square at any column width instead of stretching into tall rectangles.
-
-The heat scale is anchored to the daily goal rather than to the busiest day of the month. Reaching the goal is the last step, and a day past it keeps that step; before, one long day pushed every other cell down to the palest one. Empty days keep the frame and the faintest fill, so a short session stays visible against a day with nothing in it.
-
-The stylesheet no longer carries a forced declaration. The two places that had to outrank the app or a theme now do it by selector weight: the startup rule that keeps the left sidebar out of the first frame, and the one that drops the sidebar transition for that collapse.
-
-#### 3.4.0
-
-A redesign of the start page, with the same data, the same commands and the same settings.
-
-The page is now read by how often a question is asked. Where the day stands comes first, as one line: the clock, the date, and today's focus against the daily goal. What to start comes second: the notes column, and the timer as the first card of the side column. How the month went comes last.
-
-The notes column lost its footer hint, and the timer lost its caption. Neither was reading; both were teaching something the page already showed.
-
-The digits are the control again: a press starts, a press ends. Pause and end appear under the dial only while a session runs.
-
-The ring measures the session rather than the day. A day ring against a six hour goal moves one degree every eight minutes, which is indistinguishable from a broken one, so the day's total moved to the status line where a slow gauge belongs, and the dial went back to what it is good at: showing that something is moving. Pomodoro counts its block down; the stopwatch laps every hour.
-
-Under the surface: the stylesheet was rebuilt on one token layer with a single fallback for `color-mix`, the button reset and the components that size themselves now sit on the same footing instead of one silently flattening the other, reduced motion reaches the tokens it claims to cover, and the aggregate transition block that was swallowing two-property transitions is gone.
-
-
 ### Compatibility
 
 `data.json` keeps the same shape as 3.3.2, so an in-place upgrade needs no migration. Records are read from the same `FocusLog` files. The plugin needs Obsidian 1.13.0 or newer and does not run on mobile.
@@ -213,46 +171,6 @@ rest-count: 3
 | `add-session` | 手动添加一条记录 |
 | `open-diary` | 打开今天的日记 |
 | `open-stats` | 打开专注统计 |
-
-### 更新日志
-#### 4.0.0
-
-笔记栏不再常驻搜索框。这一行平时只有一个放大镜，按下它，搜索框从图标右侧长出来，再按一次收起，宽度还给清单。伸出是先快后慢，缩回是先慢后快，两个方向不是同一个手势，所以曲线也不同。Esc 收起并清空，打开笔记或切文件夹同样清空。上屏的文字与普通按键分开处理，确认拼音候选的 Enter 不再打开或新建笔记。
-
-统计可以问任意一段日期。第四个页签用两个原生日期框填起止，箭头按整段平移，图表按天数分组，一年只剩十几根柱而不是三百六十五根。页签与这两个日期会随插件设置一起保存，下次打开还是上次看的那一段，不再回到本周。合计一行按所用单位取词，此前单日与整月都写着「本周合计」；日均改按已经过去的天数算，不再拿月总数除以整月天数。
-
-新建笔记的命令不再把光标塞进搜索框。已输入过滤词就用它当标题建，没有就打开新建对话框。
-
-每日文件按修改时间缓存，翻统计不再重复读同一批文件，每次写入都会作废当天。
-
-#### 3.4.3
-
-3.4.2 附带的 manifest 与仓库中的文件不一致。本版对齐版本号，其余未改动。
-
-#### 3.4.2
-
-README 重写：删除顶部元信息表，加入两个收款码。插件与 3.4.1 相同。
-
-#### 3.4.1
-
-日格改成正方形。横竖各留同一个间隙，月视图的高度由宽度按 7 比 6 推出，列一窄格子仍然是方的，不再被拉成长方形。
-
-热力以每日目标为顶，不再拿当月最长的一天当分母。到目标就是最后一档，超过仍停在这一档；在这之前，只要有一天很长，其余格子全被压到最浅一档。没有记录的日子留着框和最淡的一层底色，半小时的日子才不会被读成空白。
-
-样式表里不再有强制声明。需要压过应用与主题的两处改成靠选择器权重取胜：启动时把左侧栏挡在第一帧之外的那条，以及收起时去掉侧栏过渡的那条。
-#### 3.4.0
-
-起始页重做一遍，数据、命令、设置都不变。
-
-页面按问题被问到的频次重排。今天到了哪一步放最上面，一行说清：时钟、日期、今日专注对每日目标。要开始什么放中间：笔记列，以及右栏第一张卡片的计时器。这个月过得怎么样放最后一层。
-
-笔记列底部的提示与计时器下方的说明都删了。两处都在教一件页面本身已经说清的事。
-
-数字重新成为控件：按一下开始，再按一下结束。暂停与结束只在会话进行时出现在表盘下方。
-
-环量的是这一段，不是一整天。对着六小时的目标，环每八分钟才走一度，看上去和坏了一样；今日合计因此移到状态行，那里本来就该放一个慢速的量，表盘则回到它擅长的事：让人看见东西在动。番茄钟画这一轮的倒计时，正计时每小时走一圈，从头再走。
-
-底层：样式表重建在一套令牌上，`color-mix` 只有一个后备分支；按钮重置与给出尺寸的组件现在站在一起，不再出现一个悄悄压平另一个；减弱动效终于改到它声称覆盖的令牌上；吞掉双属性过渡的聚合块已删除。
 
 ### 兼容
 

@@ -18,7 +18,7 @@ const { Plugin, ItemView, Modal, Setting, Notice, Menu, Platform, setIcon, getLa
 
 const VIEW_TYPE = "thinker-home-view";
 const STATS_VIEW_TYPE = "thinker-stats-view";
-const BUILD = "4.0.0 · search opens, range stays";
+const BUILD = "5.0.0 · search opens without a hint";
 const DATA_VERSION = 1;
 
 /* ------------------------------------------------------------------ 1  i18n */
@@ -61,11 +61,9 @@ const EN = {
   "ribbon.settings": "Thinker settings",
   "cmd.stats": "Open focus statistics",
 
-  "notes.placeholder": "Search {count} notes",
   "notes.searchLabel": "Search notes",
   "notes.hits": "{count} found",
   "notes.clearHint": "Esc to clear",
-  "notes.typeToFilter": "Type to filter",
   "notes.all": "All",
   "notes.recent": "Recent",
   "notes.pinned": "Pinned",
@@ -252,11 +250,9 @@ const ZH = {
   "ribbon.settings": "Thinker 设置",
   "cmd.stats": "打开专注统计",
 
-  "notes.placeholder": "搜索 {count} 篇笔记",
   "notes.searchLabel": "搜索笔记",
   "notes.hits": "{count} 条命中",
   "notes.clearHint": "Esc 清空",
-  "notes.typeToFilter": "直接输入即筛选",
   "notes.all": "全部",
   "notes.recent": "最近",
   "notes.pinned": "收藏",
@@ -1694,33 +1690,28 @@ class NotePanel {
   }
 
   /* One place decides what the search looks like, and every entry and exit calls
-     it, so the icon, the hint line and searchOn cannot disagree. */
+     it, so the icon, the status line and searchOn cannot disagree. Nothing is
+     written into the field and nothing hangs under the icon: an open search says
+     only that it is open, and the caret is the whole of the invitation. */
   syncSearch() {
     if (!this.toggleEl || !this.input) return;
     const active = this.searchOn === true;
     const query = this.pendingQuery || "";
-    const total = this.deps.index.entries.length;
-    const count = total.toLocaleString(lang === "zh" ? "zh-CN" : "en-US");
-    const hint = t("notes.placeholder", { count });
+    const label = t("notes.searchLabel");
     this.toggleEl.toggleClass("is-on", active || query.length > 0);
     this.toggleEl.setAttribute("aria-pressed", active ? "true" : "false");
-    this.toggleEl.setAttribute("aria-label", hint);
-    this.toggleEl.setAttribute("title", hint);
+    this.toggleEl.setAttribute("aria-label", label);
     if (this.barEl) this.barEl.toggleClass("is-open", active);
-    this.input.placeholder = hint;
     if (!this.statusEl) return;
     /* A filter that survives a blur has to be visible, or the list is quietly
-       short and nobody knows why. */
-    if (!active && !query) {
+       short and nobody knows why. An empty filter has nothing to report, so the
+       line stays unmade rather than saying what typing would do. */
+    if (!query) {
       this.statusEl.setText("");
       this.statusEl.toggleClass("is-on", false);
       return;
     }
-    this.statusEl.setText(
-      query
-        ? `${t("notes.hits", { count: this.results.length })} · ${t("notes.clearHint")}`
-        : t("notes.typeToFilter")
-    );
+    this.statusEl.setText(`${t("notes.hits", { count: this.results.length })} · ${t("notes.clearHint")}`);
     this.statusEl.toggleClass("is-on", true);
   }
 
